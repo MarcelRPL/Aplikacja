@@ -1,6 +1,7 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, redirect, session, url_for
 from flask_session import  Session
 from werkzeug.security import check_password_hash, generate_password_hash
+import sqlite3, re
 
 app = Flask(__name__)
 
@@ -9,6 +10,8 @@ app.config["SESSION_FILE_DIR"] = "./.flask_session"
 app.config["SESSION_PERMANENT"] = False
 Session(app)
 
+con = sqlite3.connect("game.db", check_same_thread=False)
+db = con.cursor()
 
 @app.route("/")
 def index():
@@ -17,13 +20,28 @@ def index():
 
 @app.route("/login")
 def login():
-    #user loging in
+    #user logging in
     return render_template("register.html")
 
-@app.route("/register")
+@app.route("/register", methods=["GET", "POST"])
 def register():
     #user registering
-    render_template("register.html")
+
+    #forget any user_id
+    session.clear()
+
+    if request.method == "POST":
+
+        username = request.form.get("username")
+        password = request.form.get("password")
+        confirm = request.form.get("confrim")
+
+        if not username:
+            return
+        
+
+    else:    
+        render_template("register.html")
 
 @app.route("/friends")
 def friends():
@@ -35,6 +53,10 @@ def logout():
     #user logging out
     render_template("index.html")
 
+@app.route("/profile")
+def profile():
+    #view users profile
+    render_template("profile.html")
 
 
 if __name__ == "__main__":
