@@ -7,7 +7,17 @@ Log In
 {% block main %}
 <form action="/login" method="post">
     <input autofocus autocomplete="off" name="username" placeholder="Username" type="text">
-    <input name="password" placeholder="Password" type="text">
+    {% if errors.get("username") %}
+    <div>
+        {{ errors["username"] }}
+    </div>
+    {% endif %}
+    <input name="password" placeholder="Password" type="password">
+    {% if errors.get("password") %}
+    <div>
+        {{ errors["password"] }}
+    </div>
+    {% endif %}
     <button type="submit">Log In</button>
 </form>
 <h4>Do you need to register?</h4>

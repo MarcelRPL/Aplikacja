@@ -7,8 +7,23 @@ Register
 {% block main %}
     <form action="/register" method="post">
         <input autofocus autocomplete="off" name="username" placeholder="Username" type="text">
-        <input autocomplete="off" name="password" placeholder="Password" type="text">
-        <input autocomplete="off" name="confirm" placeholder="Confirm password" type="text">
+        {% if errors.get("username") %}
+            <div>
+                {{ errors["username"] }}
+            </div>
+        {% endif %}
+        <input autocomplete="off" name="password" placeholder="Password" type="password">
+        {% if errors.get("password") %}
+            <div>
+                {{ errors["password"] }}
+            </div>
+        {% endif %}
+        <input autocomplete="off" name="confirm" placeholder="Confirm password" type="password">
+        {% if errors.get("confirm") %}
+            <div>
+                {{ errors["confirm"] }}
+            </div>
+        {% endif %}
         <button type="submit">Register</button>
     </form>
     <h4>Do you already have an account?</h4>

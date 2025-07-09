@@ -19,24 +19,24 @@
                 <div>
                     {% if session["user_id"] %}
                     <ul>
-                        <li>NameOfTheGame</li>
-                        <li>Profile</li>
-                        <li>Add Friend</li>
+                        <li class="nav-item"><a href="/index">NameOfTheGame</a></li>
+                        <li class="van-item"><a href="/profile">Profile</a></li>
+                        <li class="nav-item"><a href="/friends">Add Friend </a></li>
                     </ul>
                     <ul>
-                        <li>Log out</li>
+                        <li class="nav-item"><a href="/logout">Log out</a></li>
                     </ul>
                     {% else %}
                     <ul>
-                        <li>Register</li>
-                        <li>Log In</li>
+                        <li class="nav-item"><a href="/register">Register</a></li>
+                        <li class="nav-item"><a href="/login">Log In</a></li>
                     </ul>
-                    {% end if %}
+                    {% endif %}
                 </div>
             </nav>
         </header>
         <main>
-            {% main block %}
+            {% block main %}
 
             {% endblock %}
         </main>

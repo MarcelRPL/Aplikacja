@@ -1,7 +1,9 @@
-from flask import Flask, render_template, request, redirect, session, url_for
+from flask import Flask, render_template, request, flash, redirect, session, url_for
 from flask_session import  Session
 from werkzeug.security import check_password_hash, generate_password_hash
 import sqlite3, re
+
+from helpers import login_required, get_db, close_db
 
 app = Flask(__name__)
 
@@ -10,53 +12,124 @@ app.config["SESSION_FILE_DIR"] = "./.flask_session"
 app.config["SESSION_PERMANENT"] = False
 Session(app)
 
-con = sqlite3.connect("game.db", check_same_thread=False)
-db = con.cursor()
+app.teardown_appcontext(close_db)
+
+pass_re = re.compile(r"^(?=.*\d)[A-Za-z\d]{6,}$")
 
 @app.route("/")
+@login_required
 def index():
     #main game menu / looking for matches
     return render_template("index.html")
 
-@app.route("/login")
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    #user logging in
-    return render_template("register.html")
+    # User logging in
+    
+    # Forget any user_id
+    session.clear()
+
+    errors = {}
+
+    if request.method == "POST":
+        username = request.form.get("username")
+        password = request.form.get("password")
+    
+        # Check if username and password were provided
+        if not username:
+            errors["username"] = "Can't be empty"
+        
+        if not password:
+            errors["password"] = "Can't be empty"
+
+        # Check if there is data for provided username
+        db = get_db()
+        cur = db.execute("SELECT * FROM users WHERE username = ?", (username,))
+        rows = cur.fetchall()
+
+        #Check if there is only 1 row of data and hash is matching
+        if len(rows) != 1 or not check_password_hash(rows[0]["hash"], password):
+            errors["both"] = "Invalid username or password"
+        else:
+            # Remember which user has logged in
+            session["user_id"] = rows[0]["id"]
+
+        if not errors:
+            return redirect("/")
+        else:
+            return render_template("login.html", errors=errors)
+
+    else:
+        return render_template("login.html", errors=errors)
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    #user registering
+    # User registering
 
-    #forget any user_id
-    session.clear()
-
+    # Check for all the possible wrong inputs
+    errors = {}
     if request.method == "POST":
 
         username = request.form.get("username")
         password = request.form.get("password")
-        confirm = request.form.get("confrim")
+        confirm = request.form.get("confirm")
 
+        # Check if username was provided, then if it is using allowed characters
         if not username:
-            return
-        
+            errors["username"] = "Can't be empty"
+        elif not re.fullmatch(r"[A-Za-z0-9_]{3,15}", username):
+            errors["username"] = "Only 3-15 letters, digits or _"
+        else:
+            db = get_db()
+            if db.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone():
+                errors["username"] = "Username unavailable"
 
-    else:    
-        render_template("register.html")
+        # Check if password was provided, and then if it is in the right format
+        if not password:
+            errors["password"] = "Can't be empty"
+        elif not pass_re.fullmatch(password):
+            errors["password"] = "Min. 6 characters, and at least 1 digit"
+        
+        # Check if confirmation was provided and then if it is matching the password
+        if not confirm:
+            errors["confirm"] = "Repeat your password for confirmation"
+        elif confirm != password:
+            errors["confirm"] = "Different from password"
+
+        if not errors:
+            # Create users data in database by INSERTING his username and hashed password while checking if the username is available
+            try:
+                db.execute(
+                    "INSERT INTO users (username, hash) VALUES (?, ?)",
+                    (username, generate_password_hash(password))
+                    )
+                db.commit()
+                return redirect("/")
+            except sqlite3.IntegrityError:
+                errors["username"] = "Username unavialable"
+
+           
+    return render_template("register.html", errors=errors)
 
 @app.route("/friends")
+@login_required
 def friends():
     #adding friends and showing friends list
-    render_template("friends.html")
+    return render_template("friends.html")
 
 @app.route("/logout")
+@login_required
 def logout():
     #user logging out
-    render_template("index.html")
+    session.clear()
+
+    return redirect("/")
 
 @app.route("/profile")
+@login_required
 def profile():
     #view users profile
-    render_template("profile.html")
+    return render_template("profile.html")
 
 
 if __name__ == "__main__":
