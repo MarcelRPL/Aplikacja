@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+
+{% block script %}
+<script>
+    const socket = io();
+
+    socket.on('connect', () => {
+        socket.emit('join_game');
+    });
+
+    socket.on('start_game', data => {
+        const { letter1, letter2 } = data;
+    });
+
+    socket.emit("submit_word", { word: "example"});
+</script>
+{% endblock %}
+
+{% block title %}
+Game
+{% endblock %}
+
+{% block main %}
+<div>
+    <p>{{ letter_1 }}_____{{ letter_2 }}</p>
+    
+    <form action="/solo" method="post">
+        <input id="word" autocomplete="off" name="word" placeholder="Word" type="text">
+    </form>
+</div>
+<div>
+    <aside>
+        <h6>Score:</h6>
+        {% for %}
+        <p>{{ word }}</p>
+        {% endfor %}
+    </aside>
+</div>
+{% endblock %}

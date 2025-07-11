@@ -1,0 +1,29 @@
+{% extends "layout.html" %}
+
+{% block script %}
+<script>
+ 
+</script>
+{% endblock %}
+
+{% block title %}
+Game
+{% endblock %}
+
+{% block main %}
+<div>
+    <p>{{ letter_1 }}_____{{ letter_2 }}</p>
+    
+    <form action="/solo" method="post">
+        <input id="word" autocomplete="off" name="word" placeholder="Word" type="text">
+    </form>
+</div>
+<div>
+    <aside>
+        <h6>Score:</h6>
+        {% for %}
+        <p>{{ word }}</p>
+        {% endfor %}
+    </aside>
+</div>
+{% endblock %}
