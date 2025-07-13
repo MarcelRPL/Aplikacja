@@ -1,9 +1,11 @@
-from flask import Flask, render_template, request, flash, redirect, session, url_for
+from flask import Flask, render_template, request, flash, redirect, session, url_for, jsonify
 from flask_session import  Session
+from flask_socketio import SocketIO, emit, join_room, leave_room
 from werkzeug.security import check_password_hash, generate_password_hash
 import sqlite3, re
 
 from helpers import login_required, get_db, close_db
+from game_logic import load_words, valid_word, calculate_score, random_letter
 
 app = Flask(__name__)
 
@@ -12,9 +14,15 @@ app.config["SESSION_FILE_DIR"] = "./.flask_session"
 app.config["SESSION_PERMANENT"] = False
 Session(app)
 
+socketio = SocketIO(app, async_mode="eventlet", manage_session=False)
+
 app.teardown_appcontext(close_db)
 
 pass_re = re.compile(r"^(?=.*\d)[A-Za-z\d]{6,}$")
+
+VALID_WORDS = load_words(min_length=6)
+
+waiting_player = None
 
 @app.route("/")
 @login_required
@@ -111,6 +119,48 @@ def register():
            
     return render_template("register.html", errors=errors)
 
+@app.route("/solo", methods=["POST", "GET"])
+@login_required
+def solo():
+
+    # Randomize 2 letter and check if there is a word with those letter requirements
+    found = False
+
+    while found == False:
+        start = random_letter()
+        end = random_letter()
+
+        for n in VALID_WORDS:
+            if n.startswith(start) and n.endswith(end):
+                found = True
+                break
+    
+    session["start_letter"] = start
+    session["end_letter"] = end
+
+    print(f"Found valid pair: {start}-{end}")
+    return render_template("solo.html", start=start, end=end)
+
+@app.route("/check_word", methods=["POST"])
+def check_word():
+
+    # Check for the length of the word and if the word is in the dictionairy and if it has the required letters
+    word = request.form.get("word")
+    start = session.get("start_letter")
+    end = session.get("end_letter")
+
+    if valid_word(word, start, end, VALID_WORDS):
+        points = calculate_score(word)
+        return jsonify({"valid": True, "word": word, "points": points})
+    else:
+        return jsonify({"valid": False})
+
+
+@app.route("/1v1")
+@login_required
+def versus():
+    return render_template("1v1.html")
+
 @app.route("/friends")
 @login_required
 def friends():
@@ -132,5 +182,22 @@ def profile():
     return render_template("profile.html")
 
 
+@socketio.on("join_game")
+def join_game():
+    global waiting_player
+
+    if waiting_player is None:
+        waiting_player = request.sid
+        emit("waiting", {"msg": "Waiting for another player..."})
+    else:
+        room = f"game_{waiting_player}_{request.sid}"
+        join_room(room, sid=waiting_player)
+        join_room(room, sid=request.sid)
+
+
+@socketio.on("submit_word")
+def submit_word(data):
+    word = data.get("word")
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    socketio.run(app, debug=True, port=5000)

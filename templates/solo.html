@@ -7,23 +7,52 @@
 {% endblock %}
 
 {% block title %}
-Game
+Solo
 {% endblock %}
 
 {% block main %}
 <div>
-    <p>{{ letter_1 }}_____{{ letter_2 }}</p>
+    <div id="timer">30</div>
+    <h2>{{ start }}_____{{ end }}</h2>
     
-    <form action="/solo" method="post">
-        <input id="word" autocomplete="off" name="word" placeholder="Word" type="text">
-    </form>
+    <input id="word" autocomplete="off" name="word" placeholder="Word" type="text">
 </div>
 <div>
     <aside>
-        <h6>Score:</h6>
-        {% for %}
-        <p>{{ word }}</p>
-        {% endfor %}
+        <h6>Score:<div id="score">0</div></h6>
+        <ul id="guessed_words"></ul>
+        
     </aside>
 </div>
+
+<script>
+    let timeLeft = 30;
+    let timer = setInterval(() => {
+        timeLeft--;
+        $("#timer").text(timeLeft);
+        if (timeLeft <= 0) {
+            clearInterval(timer);
+            $("#word").prop("disabled", true);
+        }
+    }, 1000);
+
+
+$("#word").on("keypress", function (e) {
+    if (e.which === 13) {
+        let word = $(this).val().toLowerCase();
+        $.post("/check_word", { word: word }, function (response) {
+            if (response.valid) {
+                $("#guessed_words").append(
+                    `<li>${response.word} (+${response.points})</li>`
+                );
+                let currentScore = parseInt($("#score").text());
+                let newScore = currentScore + response.points;
+                $("#score").text(newScore);
+            }
+            $("#word").val("");
+        });
+    }
+    
+});
+</script>
 {% endblock %}
