@@ -1,3 +1,4 @@
+from datetime import datetime
 from flask import Flask, render_template, request, flash, redirect, session, url_for, jsonify
 from flask_session import  Session
 from flask_socketio import SocketIO, emit, join_room, leave_room
@@ -28,7 +29,13 @@ waiting_player = None
 @login_required
 def index():
     #main game menu / looking for matches
-    return render_template("index.html")
+    try:
+        db = get_db()
+        games = db.execute("SELECT * FROM game WHERE user_id = ? ORDER BY date DESC", (session["user_id"],))
+    except ValueError:
+        return render_template("index.html")
+    
+    return render_template("index.html", games=games)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -142,6 +149,7 @@ def solo():
     return render_template("solo.html", start=start, end=end)
 
 @app.route("/check_word", methods=["POST"])
+@login_required
 def check_word():
 
     # Check for the length of the word and if the word is in the dictionairy and if it has the required letters
@@ -155,6 +163,36 @@ def check_word():
     else:
         return jsonify({"valid": False})
 
+@app.route("/save_game", methods=["POST"])
+@login_required
+def save_game():
+
+    # pobierz dane z gry
+    data = request.get_json()
+
+    if not all (k in data for k in ("start", "end", "score", "words")):
+        return jsonify({"error": "Incomplete data"}), 400
+    # Wstaw pobrane dane w tabele "game" oraz ustal jaki to game_id
+    db = get_db()
+    game_id = db.execute("INSERT INTO game (user_id, start, end, score, mode, date) VALUES (?, ?, ?, ?, ?, ?)", (session["user_id"], data["start"], data["end"], data["score"], "solo", datetime.now().date())).lastrowid
+
+    # Wstaw użyte słowa w table "words"
+    for word in data["words"]:
+        db.execute("INSERT INTO words (game_id, user_id, word) VALUES (?, ?, ?)", (game_id, session["user_id"], word))
+        
+    db.commit()
+    print("SESSION:", session)
+    return jsonify({"success": True, "game_id": game_id})
+
+
+@app.route("/game/<int:game_id>")
+@login_required
+def game_detail(game_id):
+    db = get_db()
+    game = db.execute("SELECT * FROM game WHERE id = ? AND user_id = ?", (game_id, session["user_id"])).fetchone()
+    words = db.execute("SELECT word FROM words WHERE game_id = ?", (game_id,)).fetchall()
+
+    return jsonify ({"start": game["start"], "end": game["end"], "score": game["score"], "words": [w["word"] for w in words]})
 
 @app.route("/1v1")
 @login_required

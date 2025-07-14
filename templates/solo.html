@@ -15,7 +15,7 @@ Solo
     <div id="timer">30</div>
     <h2>{{ start }}_____{{ end }}</h2>
     
-    <input id="word" autocomplete="off" name="word" placeholder="Word" type="text">
+    <input id="word" autofocus autocomplete="off" name="word" placeholder="Word" type="text">
 </div>
 <div>
     <aside>
@@ -24,35 +24,79 @@ Solo
         
     </aside>
 </div>
+<div id="summary" class="modal hidden">
+    <div class="modal-content">
+        <h2>Summary</h2>
+        <p style="font-weight: bold"><span id="summary-start"></span>____<span id="summary-end"></span></p>
+        <p><strong>Final score:</strong><span id="summary-score"></span></p>
+        <p><strong>Guessed words:</strong></p>
+        <ul id="summary-words"></ul>
+        <a href="/solo"><button id="again">Go again</button></a>
+        <a href="/"><button id="main">Main menu</button></a>
+    </div>
 
+</div>
 <script>
     let timeLeft = 30;
+    let guessedWords = [];
+    let totalScore = 0;
+
     let timer = setInterval(() => {
         timeLeft--;
         $("#timer").text(timeLeft);
         if (timeLeft <= 0) {
             clearInterval(timer);
             $("#word").prop("disabled", true);
+            showSummary();
+            $.ajax({
+                url: "/save_game",
+                method: "POST",
+                contentType: "application/json",
+                data: JSON.stringify({
+                    start: "{{ start }}",
+                    end: "{{ end }}",
+                    score: totalScore,
+                    words: guessedWords
+                }),
+                success: function(response) {
+                    console.log("Game saved");
+                }
+            });
         }
     }, 1000);
 
 
 $("#word").on("keypress", function (e) {
     if (e.which === 13) {
+        e.preventDefault();
         let word = $(this).val().toLowerCase();
         $.post("/check_word", { word: word }, function (response) {
             if (response.valid) {
+                guessedWords.push(response.word);
+                totalScore += response.points;
+
                 $("#guessed_words").append(
                     `<li>${response.word} (+${response.points})</li>`
                 );
-                let currentScore = parseInt($("#score").text());
-                let newScore = currentScore + response.points;
-                $("#score").text(newScore);
+                $("#score").text(totalScore);
             }
             $("#word").val("");
         });
-    }
-    
+    }  
 });
+
+function showSummary() {
+    $("#summary-start").text("{{ start }}");
+    $("#summary-end").text("{{ end }}");
+    $("#summary-score").text(totalScore);
+
+    $("#summary-words").empty();
+    for (let word of guessedWords) {
+        $("#summary-words").append(`<li>${word}</li>`);
+    }
+
+    $("#summary").removeClass("hidden");
+};
 </script>
+
 {% endblock %}

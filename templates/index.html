@@ -10,8 +10,57 @@ Game
         <a href="/1v1"><button>1v1</button></a>
     </div>
     <div>
-        <aside>
-            <p>Match History:</p>
-        </aside>
+        <h3>Solo Match History:</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Letters</th>
+                    <th>Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for game in games %}
+                <tr class="game-row" data-id="{{game.id}}">
+                    <td>{{ game.date }}</td>
+                    <td>{{ game.start }}___{{ game.end }}</td>
+                    <td>{{ game.score }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
+
+    <div id="summary" class="modal hidden">
+    <div class="modal-content">
+        <h2>Summary</h2>
+        <p style="font-weight: bold"><span id="summary-start"></span>____<span id="summary-end"></span></p>
+        <p><strong>Final score:</strong><span id="summary-score"></span></p>
+        <p><strong>Guessed words:</strong></p>
+        <ul id="summary-words"></ul>
+        <button id="close">Close</button>
+    </div>
+
+    <script>
+        $(".game-row").on("click", function () {
+            const gameId = $(this).data("id");
+
+            $.get(`/game/${gameId}`, function (data) {
+                $("#summary-start").text(data.start);
+                $("#summary-end").text(data.end);
+                $("#summary-score").text(data.score);
+                $("#summary-words").empty();
+                for (let word of data.words) {
+                    $("#summary-words").append(`<li>${ word }</li>`);
+                }
+                $("#summary").removeClass("hidden");
+            });
+        });
+
+    $("#close").on("click", function () {
+        $("#summary").addClass("hidden");
+        
+    });
+    </script>
+
     {% endblock %}
