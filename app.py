@@ -1,9 +1,10 @@
 from datetime import datetime
 from flask import Flask, render_template, request, flash, redirect, session, url_for, jsonify
 from flask_session import  Session
-from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask_socketio import SocketIO, emit, join_room
 from werkzeug.security import check_password_hash, generate_password_hash
-import sqlite3, re
+import sqlite3, re, threading
+
 
 from helpers import login_required, get_db, close_db
 from game_logic import load_words, valid_word, calculate_score, random_letter
@@ -23,7 +24,10 @@ pass_re = re.compile(r"^(?=.*\d)[A-Za-z\d]{6,}$")
 
 VALID_WORDS = load_words(min_length=6)
 
+lock = threading.Lock() # Przeciwdziałanie racing condition
 waiting_player = None
+games = {}  # Struktura danych do gier online
+sid_user_map = {}
 
 @app.route("/")
 @login_required
@@ -174,7 +178,7 @@ def save_game():
         return jsonify({"error": "Incomplete data"}), 400
     # Wstaw pobrane dane w tabele "game" oraz ustal jaki to game_id
     db = get_db()
-    game_id = db.execute("INSERT INTO game (user_id, start, end, score, mode, date) VALUES (?, ?, ?, ?, ?, ?)", (session["user_id"], data["start"], data["end"], data["score"], "solo", datetime.now().date())).lastrowid
+    game_id = db.execute("INSERT INTO game (user_id, start, end, score, mode, date) VALUES (?, ?, ?, ?, ?, ?)", (session["user_id"], data["start"], data["end"], data["score"], "solo", datetime.now().strftime("%Y-%m-%d"))).lastrowid
 
     # Wstaw użyte słowa w table "words"
     for word in data["words"]:
@@ -221,21 +225,183 @@ def profile():
 
 
 @socketio.on("join_game")
+@login_required
 def join_game():
     global waiting_player
 
-    if waiting_player is None:
-        waiting_player = request.sid
-        emit("waiting", {"msg": "Waiting for another player..."})
-    else:
-        room = f"game_{waiting_player}_{request.sid}"
-        join_room(room, sid=waiting_player)
-        join_room(room, sid=request.sid)
+    with lock:
+        sid_user_map[request.sid] = session["user_id"]
+
+        if waiting_player is None:
+            waiting_player = request.sid
+            emit("waiting", {"msg": "Waiting for another player..."}, room=request.sid)
+        else:
+            player1 = waiting_player
+            player2 = request.sid
+            waiting_player = None
+
+            # Tworzymy pokój
+            room = f"game_{player1}_{player2}"
+            join_room(room, sid=player1)
+            join_room(room, sid=player2)
+            
+            # Ustalamy litery
+            start = random_letter()
+            end = random_letter()
+
+            # Tworzymy strukture danych dla danego pokoju
+            games[room] = {
+                "players": {player1: {"words": [], "score": 0},
+                            player2: {"words": [], "score": 0}},
+                "letters": (start, end),
+                "started": True,
+            }
+
+            # Wysyłami wiadomość do serwera, aby rozpocząć grę i z jakimi danymi
+            emit("start_game", {
+                "room": room,
+                "start_letter": start,
+                "end_letter": end,
+                "time": 30
+            }, room=room)
+
+            # Uruchom timer i po 30 sekundach uruchom funkcje end_game
+            threading.Timer(30.0, end_game, args=(room,)).start()
 
 
 @socketio.on("submit_word")
+@login_required
 def submit_word(data):
-    word = data.get("word")
+    word = data.get("word", "").strip().lower()
+    room = data.get("room")
+
+    if room not in games:
+        emit("error", {"msg": "Game does not exist"})
+        return
+
+    player = request.sid
+    game = games[room]
+    player_data = game["players"].get(player)
+
+    if not player_data or not game["started"]:
+        emit("error", {"msg": "Game hasn't started yet"})
+
+    start, end = game["letters"]
+    
+    if not (word.startswith(start) and word.endswith(end)):
+        emit("word_rejected", {"msg": "Wrong start/end letters"}, to=player)
+        return
+
+    if word not in VALID_WORDS:
+        emit("word_rejected", {"msg": "Word not in game dictionary"}, to=player) 
+        return
+    
+    if word in player_data["words"]:
+        emit("word_rejected", {"msg": "This word was already used"}, to=player)
+        return
+
+    score = calculate_score(word)
+    player_data["words"].append(word)
+    player_data["score"] += score
+
+    emit("word_accepted", {
+        "word": word,
+        "score": score,
+        "total": player_data["score"]
+    }, to=player)
+
+
+def end_game(room):
+    
+    # Sprawdź czy room istnieje
+    if room not in games:
+        return
+        
+    # Pobierz dane gry (dane graczy, ich punkty i słowa)
+    game = games[room]
+    players = list(game["players"].keys())
+    if len(players) < 2:
+        for sid in players:
+            socketio.emit("game_cancelled", {"msg": "Opponenct disconnected."}, to=sid)
+        del games[room]
+        return
+
+    start, end = game["letters"]
+
+    results = []
+    with app.app_context():
+        db = get_db()
+
+        for player_sid in players:
+            user_id = sid_user_map.get(player_sid)
+            opponent_sid = [sid for sid in players if sid != player_sid][0]
+            opponent_id = sid_user_map.get(opponent_sid)
+
+            score = game["players"][player_sid]["score"]
+            words = game["players"][player_sid]["words"]
+        
+            # Zapisz dane z gry w bazie danych
+            game_id = db.execute("INSERT INTO game (user_id, opponent_id, start, end, score, mode, date) VALUES (?, ?, ?, ?, ?, ?, ?)", (user_id, opponent_id, start, end, score, "1v1", datetime.now().date())).lastrowid
+        
+            for word in words:
+                db.execute("INSERT INTO words (game_id, user_id, word) VALUES (?, ?, ?)", (game_id, user_id, word))
+
+            results.append({"sid": player_sid, "score": score, "words": words})
+
+        db.commit()
+
+    # Porównaj wyniki
+
+    p1, p2 = results
+
+    if p1["score"] > p2["score"]:
+        winner, loser = p1, p2
+    elif p2["score"] > p1["score"]:
+        winner, loser = p2, p1
+    else:
+        winner = loser = None
+
+    for p in results:
+        socketio.emit("game_over", {
+            "your_score": p["score"],
+            "your_words": p["words"],
+            "opponent_score": results[1]["score"] if p == results[0] else results[0]["score"],
+            "opponent_words": results[1]["words"] if p == results[0] else results[0]["words"],
+            "result": "Win" if p == winner else ("Lose" if p == loser else "Draw")
+        }, room=p["sid"])
+
+    # Usuwamy dane o zamkniętej grze
+    del games[room]
+    del sid_user_map[players[0]]
+    del sid_user_map[players[1]]
+
+@socketio.on("disconnect")
+def handle_disconnect():
+    global waiting_player
+    sid = request.sid
+    
+    print(f"User has disconnected: {sid}")
+
+    if sid == waiting_player:
+        waiting_player = None
+
+    user_id = sid_user_map.pop(sid, None)
+
+    room_to_delete = None
+    for room, game in games.items():
+        if sid in game["players"]:
+            del game["players"][sid]
+
+            for other_sid in game["players"]:
+                socketio.emit("opponent_disconnected", {}, to=other_sid)
+
+            if not game["players"]:
+                room_to_delete = room
+            break
+    
+    if room_to_delete:
+        del games[room_to_delete]
+    
 
 if __name__ == "__main__":
     socketio.run(app, debug=True, port=5000)

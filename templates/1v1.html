@@ -2,38 +2,140 @@
 
 {% block script %}
 <script>
-    const socket = io();
+    $(document).ready(function () {
+        const socket = io();
 
-    socket.on('connect', () => {
-        socket.emit('join_game');
+        let room = null;
+        let timeLeft = 30;
+        let guessedWords = []
+
+        // Dołączenie do pokoju
+        socket.emit("join_game");
+
+        // Czekanie na drugiego gracza
+        socket.on("waiting", function (data) {
+            $("#status").text(data.msg);
+        });
+
+        // Gra się rozpoczyna
+        socket.on("start_game", function (data) {
+            room = data.room;
+            $("#status").hide();
+            $("#game").show();
+
+            $("#letters").text(`${data.start_letter}____${data.end_letter}`);
+
+            // Timer 
+            let timer = setInterval(() => {
+                timeLeft--;
+                $("#timer").text(timeLeft);
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    $("#word").prop("disabled", true);
+                    $("#submit").prop("disabled", true);
+                }
+            }, 1000)
+        });
+
+        // Akceptowanie słów
+        socket.on("word_accepted", function (data) {
+            guessedWords.push(data.word);
+            $("#guessed_words").append(`<li>${data.word} (+${data.score})</li>`);
+            $("#score").text(data.total);
+            $("#feedback").text("Word accepted!");
+        });
+
+        // Odrzucanie słowa
+        socket.on("word_rejected", function (data) {
+            $("#feedback").text(`${data.msg}`);
+        });
+
+        // Koniec gry - podsumowanie
+        socket.on("game_over", function (data) {
+            console.log("GAME OVER:", data);
+            $("#summary").removeClass("hidden");
+
+            $("#summary-your-score").text(`Your score: ${data.your_score}`);
+            $("#summary-opponent-score").text(`Opponnent's score: ${data.opponent_score}`);
+            $("#summary-result").text(`Result: ${data.result}`);
+
+
+            // Twoje słowa
+            $("#summary-words").empty();
+            for (let word of data.your_words) {
+                $("#summary-words").append(`<li>${word}</li>`);
+            }
+
+            // Słowa przeciwnika
+            $("#summary-opponent-words").empty();
+            for (let word of data.opponent_words) {
+                $("#summary-opponent-words").append(`<li>${word}</li>`);
+            }
+        });
+        
+        // Wprowadzanie słowa
+        $("#word").on("keypress", function (e) {
+            if (e.which === 13) {
+                const word = $(this).val().toLowerCase().trim();
+                if (word && room) {
+                    socket.emit("submit_word", {
+                        word: word,
+                        room: room
+                    });
+                }
+                $(this).val("");
+            }
+        });
+
+        socket.on("opponent_disconnected", function () {
+            alert("Your opponent has left the game.");
+            window.location.href = "/";
+        });
+
+        socket.on("game_cancelled", function (data) {
+            alert(data.msg);
+            window.location.href = "/";
+        });
     });
-
-    socket.on('start_game', data => {
-        const { letter1, letter2 } = data;
-    });
-
-    socket.emit("submit_word", { word: "example"});
 </script>
 {% endblock %}
 
 {% block title %}
-Game
+1v1
 {% endblock %}
 
 {% block main %}
 <div>
-    <p>{{ letter_1 }}_____{{ letter_2 }}</p>
-    
-    <form action="/solo" method="post">
-        <input id="word" autocomplete="off" name="word" placeholder="Word" type="text">
-    </form>
-</div>
-<div>
-    <aside>
-        <h6>Score:</h6>
-        {% for %}
-        <p>{{ word }}</p>
-        {% endfor %}
-    </aside>
+    <div id="status">Connecting to a game...</div>
+
+    <div id="game" class="hidden">
+        <div id="timer">30</div>
+        <h2 id="letters"></h2>
+
+        <input id="word" autofocus autocomplete="off" placeholder="Enter word" type="text">
+
+        <div id="feedback"></div>
+        
+        <h6>Score: <span id="score">0</span></h6>
+        <ul id="guessed_words"></ul>
+    </div>
+
+    <div id="summary" class="modal hidden">
+        <div class="modal-content">
+            <h2>Summary</h2>
+            <p id="summary-your-score"></p>
+            <p id="summary-opponent-score"></p>
+            <p id="summary-result"></p>
+
+            <p><strong>Your words:</strong></p>
+            <ul id="summary-words"></ul>
+
+            <p><strong>Opponent's words:</strong></p>
+            <ul id="summary-opponent-words"></ul>
+
+            <a href="1v1"><button>Play again</button></a>
+            <a href="/"><button>Main menu</button></a>
+        </div>
+    </div>
 </div>
 {% endblock %}
