@@ -266,7 +266,7 @@ def join_game():
             }, room=room)
 
             # Uruchom timer i po 30 sekundach uruchom funkcje end_game
-            threading.Timer(30.0, end_game, args=(room,)).start()
+            socketio.start_background_task(game_timer, room)
 
 
 @socketio.on("submit_word")
@@ -312,7 +312,8 @@ def submit_word(data):
 
 
 def end_game(room):
-    
+    print(f"===> ENding game for room {room}")
+
     # Sprawdź czy room istnieje
     if room not in games:
         return
@@ -360,17 +361,21 @@ def end_game(room):
         winner, loser = p2, p1
     else:
         winner = loser = None
-
+    
     for p in results:
+        print(f"Emitting game_over to sid: {p['sid']}")
         socketio.emit("game_over", {
             "your_score": p["score"],
             "your_words": p["words"],
             "opponent_score": results[1]["score"] if p == results[0] else results[0]["score"],
             "opponent_words": results[1]["words"] if p == results[0] else results[0]["words"],
             "result": "Win" if p == winner else ("Lose" if p == loser else "Draw")
-        }, room=p["sid"])
+        }, to=p["sid"])
 
     # Usuwamy dane o zamkniętej grze
+    global waiting_player
+    if waiting_player in room:
+        waiting_player = None
     del games[room]
     del sid_user_map[players[0]]
     del sid_user_map[players[1]]
@@ -379,7 +384,7 @@ def end_game(room):
 def handle_disconnect():
     global waiting_player
     sid = request.sid
-    
+
     print(f"User has disconnected: {sid}")
 
     if sid == waiting_player:
@@ -401,6 +406,10 @@ def handle_disconnect():
     
     if room_to_delete:
         del games[room_to_delete]
+
+def game_timer(room):
+    socketio.sleep(30)
+    end_game(room)
     
 
 if __name__ == "__main__":
