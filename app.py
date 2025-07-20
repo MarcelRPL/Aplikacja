@@ -35,11 +35,19 @@ def index():
     #main game menu / looking for matches
     try:
         db = get_db()
-        games = db.execute("SELECT * FROM game WHERE user_id = ? ORDER BY date DESC", (session["user_id"],))
+        solos = db.execute("SELECT * FROM game WHERE user_id = ? AND mode = ? ORDER BY date DESC", (session["user_id"], "solo")).fetchall()
     except ValueError:
         return render_template("index.html")
     
-    return render_template("index.html", games=games)
+    try:
+        versus = db.execute("SELECT * FROM game WHERE user_id = ? AND mode = ? ORDER BY date DESC", (session["user_id"], "1v1"))
+        opponent_row = db.execute("SELECT username FROM users WHERE id IN (SELECT opponent_id FROM game WHERE user_id = ?)", (session["user_id"],)).fetchone()
+    except ValueError:
+        return render_template("index.html")
+    
+    opponent = opponent_row["username"] if opponent_row else None
+    
+    return render_template("index.html", solos=solos, versus=versus, opponent=opponent)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -194,9 +202,34 @@ def save_game():
 def game_detail(game_id):
     db = get_db()
     game = db.execute("SELECT * FROM game WHERE id = ? AND user_id = ?", (game_id, session["user_id"])).fetchone()
-    words = db.execute("SELECT word FROM words WHERE game_id = ?", (game_id,)).fetchall()
+    words = db.execute("SELECT word FROM words WHERE game_id = ?", (game_id,)).fetchall()  
 
     return jsonify ({"start": game["start"], "end": game["end"], "score": game["score"], "words": [w["word"] for w in words]})
+
+@app.route("/match/<int:match_id>")
+@login_required
+def match_detail(match_id):
+    viewer_id = request.args.get("viewer_id", type=int)
+    db = get_db()
+    games = db.execute("SELECT * FROM game WHERE match_id = ?", (match_id,)).fetchall()
+
+    if len(games) != 2:
+        return jsonify({"error": "Match not found"}), 404
+    
+    game_1 = games[0]
+    game_2 = games[1]
+
+    if game_1["user_id"] == viewer_id:
+        player_game = game_1
+        opponent_game = game_2
+    else:
+        player_game = game_2
+        opponent_game = game_1
+    
+    your_words = db.execute("SELECT word FROM words WHERE game_id = ? AND user_id = ?",(player_game["id"], player_game["user_id"])).fetchall()
+    opponent_words = db.execute("SELECT word FROM words WHERE game_id = ? AND user_id = ?",(opponent_game["id"], opponent_game["user_id"])).fetchall()
+
+    return jsonify({"start": player_game["start"], "end": player_game["end"], "score": player_game["score"], "words": [w["word"] for w in your_words], "opponent_score": opponent_game["score"], "opponent_words": [w["word"] for w in opponent_words]})
 
 @app.route("/1v1")
 @login_required
@@ -267,6 +300,7 @@ def join_game():
 
             # Uruchom timer i po 30 sekundach uruchom funkcje end_game
             socketio.start_background_task(game_timer, room)
+            print("Game started for:", session.get("user_id"))
 
 
 @socketio.on("submit_word")
@@ -333,21 +367,24 @@ def end_game(room):
     with app.app_context():
         db = get_db()
 
+        match_id = db.execute("SELECT IFNULL(MAX(match_id_, 0) + 1 FROM game)").fetchone()[0]
+
         for player_sid in players:
             user_id = sid_user_map.get(player_sid)
             opponent_sid = [sid for sid in players if sid != player_sid][0]
             opponent_id = sid_user_map.get(opponent_sid)
 
             score = game["players"][player_sid]["score"]
+            op_score = game["players"][opponent_sid]["score"]
             words = game["players"][player_sid]["words"]
         
             # Zapisz dane z gry w bazie danych
-            game_id = db.execute("INSERT INTO game (user_id, opponent_id, start, end, score, mode, date) VALUES (?, ?, ?, ?, ?, ?, ?)", (user_id, opponent_id, start, end, score, "1v1", datetime.now().date())).lastrowid
+            game_id = db.execute("INSERT INTO game (user_id, opponent_id, start, end, score, opponent_score, mode, date, match_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (user_id, opponent_id, start, end, score, op_score, "1v1", datetime.now().date(), match_id)).lastrowid
         
             for word in words:
                 db.execute("INSERT INTO words (game_id, user_id, word) VALUES (?, ?, ?)", (game_id, user_id, word))
 
-            results.append({"sid": player_sid, "score": score, "words": words})
+            results.append({"sid": player_sid, "user_id": user_id, "score": score, "words": words, "game_id": game_id})
 
         db.commit()
 
@@ -361,16 +398,25 @@ def end_game(room):
         winner, loser = p2, p1
     else:
         winner = loser = None
-    
-    for p in results:
-        print(f"Emitting game_over to sid: {p['sid']}")
-        socketio.emit("game_over", {
-            "your_score": p["score"],
-            "your_words": p["words"],
-            "opponent_score": results[1]["score"] if p == results[0] else results[0]["score"],
-            "opponent_words": results[1]["words"] if p == results[0] else results[0]["words"],
-            "result": "Win" if p == winner else ("Lose" if p == loser else "Draw")
-        }, to=p["sid"])
+    with app.app_context():
+        for p in results:
+            print(f"Emitting game_over to sid: {p['sid']}")
+            socketio.emit("game_over", {
+                "your_score": p["score"],
+                "your_words": p["words"],
+                "opponent_score": results[1]["score"] if p == results[0] else results[0]["score"],
+                "opponent_words": results[1]["words"] if p == results[0] else results[0]["words"],
+                "result": "Win" if p == winner else ("Lose" if p == loser else "Draw")
+            }, to=p["sid"])
+            db = get_db()
+            if p == winner:
+                db.execute("UPDATE game SET result = ? WHERE id = ?", ("win", p["game_id"]))
+            elif p == loser:
+                db.execute("UPDATE game SET result = ? WHERE id = ?", ("loss", p["game_id"]))
+            else:
+                db.execute("UPDATE game SET result = ? WHERE id = ?", ("draw", p["game_id"]))
+        
+        db.commit()
 
     # Usuwamy dane o zamkniętej grze
     global waiting_player

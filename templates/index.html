@@ -14,53 +14,149 @@ Game
         <table>
             <thead>
                 <tr>
-                    <th>Date</th>
-                    <th>Letters</th>
-                    <th>Score</th>
+                    <th style="text-align: center">Date</th>
+                    <th style="text-align: center">Letters</th>
+                    <th style="text-align: center">Score</th>
                 </tr>
             </thead>
             <tbody>
-                {% for game in games %}
-                <tr class="game-row" data-id="{{game.id}}">
-                    <td>{{ game.date }}</td>
-                    <td>{{ game.start }}___{{ game.end }}</td>
-                    <td>{{ game.score }}</td>
+                {% if solos %}
+                    {% for game in solos %}
+                    <tr class="game-row" data-id="{{game.id}}">
+                        <td style="text-align: center">{{ game.date }}</td>
+                        <td style="text-align: center">{{ game.start }}___{{ game.end }}</td>
+                        <td style="text-align: center">{{ game.score }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="3">No solo games yet.</td>
+                    </tr>
+                {% endif %}    
+                </tbody>
+        </table>
+        <h3>1v1 Match History:</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th style="text-align: center">Date</th>
+                    <th style="text-align: center">Letters</th>
+                    <th style="text-align: center">Opponent</th>
+                    <th style="text-align: center">Score</th>
+                    <th style="text-align: center">Opponent's Score</th>
+                    <th style="text-align: center">Result</th>
                 </tr>
-                {% endfor %}
-            </tbody>
+            </thead>
+            <tbody>
+                {% if versus %}
+                    {% for game in versus %}
+                    <tr class="game-row2" data-match_id="{{game.match_id}}" data-user_id="{{game.user_id}}">
+                        <td style="text-align: center">{{ game.date }}</td>
+                        <td style="text-align: center">{{ game.start }}___{{ game.end }}</td>
+                        <td style="text-align: center">{{ opponent }}</td>
+                        <td style="text-align: center">{{ game.score }}</td>
+                        <td style="text-align: center">{{ game.opponent_score }}</td>
+                        <td style="text-align: center">{{ game.result }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="3">No 1v1 games yet.</td>
+                    </tr>
+                {% endif %}    
+                </tbody>
         </table>
     </div>
 
     <div id="summary" class="modal hidden">
-    <div class="modal-content">
-        <h2>Summary</h2>
-        <p style="font-weight: bold"><span id="summary-start"></span>____<span id="summary-end"></span></p>
-        <p><strong>Final score:</strong><span id="summary-score"></span></p>
-        <p><strong>Guessed words:</strong></p>
-        <ul id="summary-words"></ul>
-        <button id="close">Close</button>
+        <div class="modal-content">
+            <h2>Summary</h2>
+            <p style="font-weight: bold"><span id="summary-start"></span>____<span id="summary-end"></span></p>
+            <p><strong>Final score:</strong><span id="summary-score"></span></p>
+            <p><strong>Guessed words:</strong></p>
+            <ul id="summary-words"></ul>
+            <button id="close">Close</button>
+        </div>
+    </div>
+
+    <div id="summary-1v1" class="modal hidden">
+        <div class="modal-content">
+            <h2>Summary</h2>
+            <p><strong>Result</strong><span id="result"></span></p>
+            <p style="font-weight: bold"><span id="summary-start-1v1"></span>____<span id="summary-end-1v1"></span></p>
+            <p><strong>Final score:</strong><span id="player-score"></span></p>
+            <p><strong>Guessed words:</strong></p>
+            <ul id="player-words"></ul>
+            <p><strong>Opponent's score:</strong><span id="opponent-score"></span></p>
+            <p><strong>Opponent's words:</strong></p>
+            <ul id="opponent-words"></ul>
+            <button id="close-1v1">Close</button>
+        </div>
     </div>
 
     <script>
-        $(".game-row").on("click", function () {
-            const gameId = $(this).data("id");
+        $(document).ready(function () {
+            $(".game-row").on("click", function () {
+                const gameId = $(this).data("id");
 
-            $.get(`/game/${gameId}`, function (data) {
-                $("#summary-start").text(data.start);
-                $("#summary-end").text(data.end);
-                $("#summary-score").text(data.score);
-                $("#summary-words").empty();
-                for (let word of data.words) {
-                    $("#summary-words").append(`<li>${ word }</li>`);
-                }
-                $("#summary").removeClass("hidden");
+                $.get(`/game/${gameId}`, function (data) {
+                    $("#summary-start").text(data.start);
+                    $("#summary-end").text(data.end);
+                    $("#summary-score").text(data.score);
+                    
+                    $("#summary-words").empty();
+                    for (let word of data.words) {
+                        $("#summary-words").append(`<li>${ word }</li>`);
+                    }
+                
+                    $("#summary").removeClass("hidden");
+                });      
             });
-        });
 
-    $("#close").on("click", function () {
-        $("#summary").addClass("hidden");
-        
-    });
+
+            $("#close").on("click", function () {
+                $("#summary").addClass("hidden");
+            });
+
+            $(".game-row2").on("click", function () {
+                const matchId = $(this).data("match_id");
+                const userId = $(this).data("user_id")
+
+                $.get(`/match/${matchId}?viewer_id=${userId}`, function (data) {
+                    $("#summary-start-1v1").text(data.start)
+                    $("#summary-end-1v1").text(data.end)
+                    $("#player-score").text(data.score)
+                    $("#opponent-score").text(data.opponent_score)
+                    
+                    $("#player-words").empty();
+                    for (let word of data.words) {
+                        $("#player-words").append(`<li>${ word }</li>`)
+                    }
+                    
+                    $("#opponent-words").empty();
+                    for (let word of data.opponent_words) {
+                        $("#opponent-words").append(`<li>${ word }</li>`)
+                    }
+
+                    if (data.score > data.opponent_score) {
+                        $("#result").text("Win")
+                    }
+                    else if (data.score < data.opponent_score) {
+                        $("#result").text("Loss")
+                    }
+                    else {
+                        $("#result").text("Draw")
+                    }
+
+                    $("#summary-1v1").removeClass("hidden")
+                });
+            });
+
+            $("#close-1v1").on("click", function () {
+                $("#summary-1v1").addClass("hidden")
+            })
+
+        });
     </script>
 
     {% endblock %}
