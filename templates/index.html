@@ -53,7 +53,7 @@ Game
                     <tr class="game-row2" data-match_id="{{game.match_id}}" data-user_id="{{game.user_id}}">
                         <td style="text-align: center">{{ game.date }}</td>
                         <td style="text-align: center">{{ game.start }}___{{ game.end }}</td>
-                        <td style="text-align: center">{{ opponent }}</td>
+                        <td style="text-align: center">{{ game.opponent_username }}</td>
                         <td style="text-align: center">{{ game.score }}</td>
                         <td style="text-align: center">{{ game.opponent_score }}</td>
                         <td style="text-align: center">{{ game.result }}</td>
@@ -154,8 +154,7 @@ Game
 
             $("#close-1v1").on("click", function () {
                 $("#summary-1v1").addClass("hidden")
-            })
-
+            });
         });
     </script>
 

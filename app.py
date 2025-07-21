@@ -33,21 +33,24 @@ sid_user_map = {}
 @login_required
 def index():
     #main game menu / looking for matches
-    try:
-        db = get_db()
-        solos = db.execute("SELECT * FROM game WHERE user_id = ? AND mode = ? ORDER BY date DESC", (session["user_id"], "solo")).fetchall()
-    except ValueError:
-        return render_template("index.html")
+   
+    db = get_db()
+    solos = db.execute("SELECT * FROM game WHERE user_id = ? AND mode = ? ORDER BY date DESC", (session["user_id"], "solo")).fetchall()
     
-    try:
-        versus = db.execute("SELECT * FROM game WHERE user_id = ? AND mode = ? ORDER BY date DESC", (session["user_id"], "1v1"))
-        opponent_row = db.execute("SELECT username FROM users WHERE id IN (SELECT opponent_id FROM game WHERE user_id = ?)", (session["user_id"],)).fetchone()
-    except ValueError:
-        return render_template("index.html")
+    versus_games = db.execute("SELECT * FROM game WHERE user_id = ? AND mode = ? ORDER BY date DESC", (session["user_id"], "1v1")).fetchall()
+
+    versus = []
+    for game in versus_games:
+        opponent_id = game["opponent_id"]
+        opponent_row = db.execute("SELECT username FROM users WHERE id = ?", (opponent_id,)).fetchone()
+        opponent_username = opponent_row["username"] if opponent_row else "Unknown"
+
+        game_dict = dict(game)
+        game_dict["opponent_username"] = opponent_username
+        versus.append(game_dict)
+   
     
-    opponent = opponent_row["username"] if opponent_row else None
-    
-    return render_template("index.html", solos=solos, versus=versus, opponent=opponent)
+    return render_template("index.html", solos=solos, versus=versus)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -254,7 +257,42 @@ def logout():
 @login_required
 def profile():
     #view users profile
-    return render_template("profile.html")
+    db = get_db()
+    username = db.execute("SELECT username FROM users WHERE id = ?", (session["user_id"],)).fetchone()[0]
+
+    solos = db.execute("SELECT * FROM game WHERE user_id = ? AND mode = ? ORDER BY date DESC", (session["user_id"], "solo")).fetchall()
+    
+    versus_games = db.execute("SELECT * FROM game WHERE user_id = ? AND mode = ? ORDER BY date DESC", (session["user_id"], "1v1")).fetchall()
+
+    versus = []
+    for game in versus_games:
+        opponent_id = game["opponent_id"]
+        opponent_row = db.execute("SELECT username FROM users WHERE id = ?", (opponent_id,)).fetchone()
+        opponent_username = opponent_row["username"] if opponent_row else "Unknown"
+
+        game_dict = dict(game)
+        game_dict["opponent_username"] = opponent_username
+        versus.append(game_dict)
+
+    # Set highscore, winrate, wins, losses, games
+    stats = {}
+    stats["versus"] = db.execute("SELECT COUNT(id) FROM game WHERE user_id = ? AND mode = ?", (session["user_id"], "1v1")).fetchone()[0]
+    stats["highscore"] = db.execute("SELECT MAX(score) FROM game WHERE user_id = ?", (session["user_id"],)).fetchone()[0]
+    stats["highscore_versus"] = db.execute("SELECT MAX(score) FROM game WHERE user_id = ? AND mode = ?", (session["user_id"], "1v1")).fetchone()[0]
+    stats["wins"] = db.execute("SELECT COUNT(id) FROM game WHERE user_id = ? AND result = ?", (session["user_id"], "win")).fetchone()[0]
+    stats["losses"] = db.execute("SELECT COUNT(id) FROM game WHERE user_id = ? AND result = ?", (session["user_id"], "loss")).fetchone()[0]
+    stats["draws"] = db.execute("SELECT COUNT(id) FROM game WHERE user_id = ? AND result = ?", (session["user_id"], "draw")).fetchone()[0]
+    if stats["versus"] != 0:   
+        stats["winrate"] = round(((stats["wins"] + 0.5 * stats["draws"]) / stats["versus"]) * 100, 2)
+    else:
+        stats["winrate"] = 0
+
+    stats["word_count"] = db.execute("SELECT COUNT(DISTINCT word) FROM words WHERE user_id = ?", (session["user_id"],)).fetchone()[0]
+    stats["valid"] = 0
+    for word in VALID_WORDS:
+        stats["valid"] += 1
+
+    return render_template("profile.html", solos=solos, versus=versus, stats=stats, username=username)
 
 
 @socketio.on("join_game")
