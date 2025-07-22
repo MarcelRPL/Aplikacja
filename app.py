@@ -1,5 +1,5 @@
 from datetime import datetime
-from flask import Flask, render_template, request, flash, redirect, session, url_for, jsonify
+from flask import Flask, abort, render_template, request, flash, redirect, session, url_for, jsonify
 from flask_session import  Session
 from flask_socketio import SocketIO, emit, join_room
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -141,6 +141,14 @@ def register():
            
     return render_template("register.html", errors=errors)
 
+@app.route("/logout")
+@login_required
+def logout():
+    #user logging out
+    session.clear()
+
+    return redirect("/")
+
 @app.route("/solo", methods=["POST", "GET"])
 @login_required
 def solo():
@@ -239,30 +247,35 @@ def match_detail(match_id):
 def versus():
     return render_template("1v1.html")
 
-@app.route("/friends")
+@app.route("/search")
 @login_required
-def friends():
-    #adding friends and showing friends list
-    return render_template("friends.html")
+def search():
+    # Rendering a form for searching for other palyers
+    username = request.args.get("user")
 
-@app.route("/logout")
-@login_required
-def logout():
-    #user logging out
-    session.clear()
+    if not username:
+        flash("Must provide a username")
 
-    return redirect("/")
-
-@app.route("/profile")
-@login_required
-def profile():
-    #view users profile
     db = get_db()
-    username = db.execute("SELECT username FROM users WHERE id = ?", (session["user_id"],)).fetchone()[0]
+    user = db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
 
-    solos = db.execute("SELECT * FROM game WHERE user_id = ? AND mode = ? ORDER BY date DESC", (session["user_id"], "solo")).fetchall()
+    if user:
+       return redirect(url_for("view_profile", username=username))
+    else:
+        flash("Palyer not found")
+        return render_template("search.html")
     
-    versus_games = db.execute("SELECT * FROM game WHERE user_id = ? AND mode = ? ORDER BY date DESC", (session["user_id"], "1v1")).fetchall()
+
+@app.route("/profile/<username>")
+@login_required
+def view_profile(username):
+
+    db = get_db()
+    user = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+
+    solos = db.execute("SELECT * FROM game WHERE user_id = ? AND mode = ? ORDER BY date DESC", (user["id"], "solo")).fetchall()
+    
+    versus_games = db.execute("SELECT * FROM game WHERE user_id = ? AND mode = ? ORDER BY date DESC", (user["id"], "1v1")).fetchall()
 
     versus = []
     for game in versus_games:
@@ -276,23 +289,54 @@ def profile():
 
     # Set highscore, winrate, wins, losses, games
     stats = {}
-    stats["versus"] = db.execute("SELECT COUNT(id) FROM game WHERE user_id = ? AND mode = ?", (session["user_id"], "1v1")).fetchone()[0]
-    stats["highscore"] = db.execute("SELECT MAX(score) FROM game WHERE user_id = ?", (session["user_id"],)).fetchone()[0]
-    stats["highscore_versus"] = db.execute("SELECT MAX(score) FROM game WHERE user_id = ? AND mode = ?", (session["user_id"], "1v1")).fetchone()[0]
-    stats["wins"] = db.execute("SELECT COUNT(id) FROM game WHERE user_id = ? AND result = ?", (session["user_id"], "win")).fetchone()[0]
-    stats["losses"] = db.execute("SELECT COUNT(id) FROM game WHERE user_id = ? AND result = ?", (session["user_id"], "loss")).fetchone()[0]
-    stats["draws"] = db.execute("SELECT COUNT(id) FROM game WHERE user_id = ? AND result = ?", (session["user_id"], "draw")).fetchone()[0]
+    stats["versus"] = db.execute("SELECT COUNT(id) FROM game WHERE user_id = ? AND mode = ?", (user["id"], "1v1")).fetchone()[0]
+    stats["highscore"] = db.execute("SELECT MAX(score) FROM game WHERE user_id = ?", (user["id"],)).fetchone()[0]
+    stats["highscore_versus"] = db.execute("SELECT MAX(score) FROM game WHERE user_id = ? AND mode = ?", (user["id"], "1v1")).fetchone()[0]
+    stats["wins"] = db.execute("SELECT COUNT(id) FROM game WHERE user_id = ? AND result = ?", (user["id"], "win")).fetchone()[0]
+    stats["losses"] = db.execute("SELECT COUNT(id) FROM game WHERE user_id = ? AND result = ?", (user["id"], "loss")).fetchone()[0]
+    stats["draws"] = db.execute("SELECT COUNT(id) FROM game WHERE user_id = ? AND result = ?", (user["id"], "draw")).fetchone()[0]
     if stats["versus"] != 0:   
         stats["winrate"] = round(((stats["wins"] + 0.5 * stats["draws"]) / stats["versus"]) * 100, 2)
     else:
         stats["winrate"] = 0
 
-    stats["word_count"] = db.execute("SELECT COUNT(DISTINCT word) FROM words WHERE user_id = ?", (session["user_id"],)).fetchone()[0]
+    stats["word_count"] = db.execute("SELECT COUNT(DISTINCT word) FROM words WHERE user_id = ?", (user["id"],)).fetchone()[0]
     stats["valid"] = 0
     for word in VALID_WORDS:
         stats["valid"] += 1
 
-    return render_template("profile.html", solos=solos, versus=versus, stats=stats, username=username)
+    stats["completion"] = round((stats["word_count"] / stats["valid"]) * 100, 3) 
+
+
+    if user["id"] == session["user_id"]:
+        return render_template("profile.html", solos=solos, versus=versus, stats=stats, username=username)
+    else:
+        return render_template("player.html", solos=solos, versus=versus, stats=stats, username=username)
+
+@app.route("/add_friend", methods=["POST"])
+@login_required
+def add_friend():
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "message": "No data received"}), 404
+
+    friend_username = data.get("friend")
+    if not friend_username:
+        return jsonify({"success": False, "message": "No username provided"}), 404
+
+    db = get_db()
+
+    user_id = session["user_id"]
+    friend_id = db.execute("SELECT id FROM users WHERE username = ?", (friend_username,)).fetchone()[0]
+
+    if not friend_id:
+        return jsonify({"success": False, "message": "User not found"}), 404
+
+    
+    db.execute("INSERT INTO friends (user_id, friend_id) VALUES (?, ?)", (user_id, friend_id))
+
+    db.commit()
+    return jsonify({"success": True, "message": "Friend added"})
 
 
 @socketio.on("join_game")
@@ -495,6 +539,17 @@ def game_timer(room):
     socketio.sleep(30)
     end_game(room)
     
+@app.context_processor
+def inject_user():
+    db = get_db()
+    user_id = session["user_id"]
+
+    if user_id:
+        user = db.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()
+        if user:
+            return {"logged_in_user": user["username"]}
+    return {}
+
 
 if __name__ == "__main__":
     socketio.run(app, debug=True, port=5000)

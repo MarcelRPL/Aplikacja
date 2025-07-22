@@ -24,8 +24,8 @@
                     {% if session["user_id"] %}
                     <ul>
                         <li class="nav-item"><a href="/">NameOfTheGame</a></li>
-                        <li class="van-item"><a href="/profile">Profile</a></li>
-                        <li class="nav-item"><a href="/friends">Add Friend</a></li>
+                        <li class="van-item"><a href="/profile/{{ logged_in_user }}">Profile</a></li>
+                        <li class="nav-item"><a href="/search">Add friends</a></li>
                     </ul>
                     <ul>
                         <li class="nav-item"><a href="/logout">Log out</a></li>

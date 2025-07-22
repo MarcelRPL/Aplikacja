@@ -72,6 +72,8 @@
         <h5>Used words {{ stats.word_count }}/{{ stats.valid }}</h5>
         <h6>Dictionary completion: {{ stats.completion }}%</h6>
     </div>
+    <button onclick="addFriend('{{ username }}')">Add friend</button>
+    <button>Invite to a game</button>
 </div>
 
 
@@ -163,5 +165,19 @@
                 $("#summary-1v1").addClass("hidden")
             });
         });
+
+    function addFriend(username) {
+        fetch("/add_friend", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ friend: username})
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.messsage);
+        });
+    }    
     </script>
 {% endblock %}

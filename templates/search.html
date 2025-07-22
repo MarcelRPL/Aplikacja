@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+
+{% block title %}
+Search
+{% endblock %}
+
+{% block main %}
+<form action="/search" method="get">
+    <input autofocus name="user" placeholder="Username" type="text">
+    <button type="submit">Search</button>
+</form>
+
+{% endblock %}
