@@ -313,30 +313,69 @@ def view_profile(username):
     else:
         return render_template("player.html", solos=solos, versus=versus, stats=stats, username=username)
 
-@app.route("/add_friend", methods=["POST"])
+@app.route("/friend_request", methods=["POST"])
 @login_required
-def add_friend():
+def friend_request():
     data = request.get_json()
-    if not data:
-        return jsonify({"success": False, "message": "No data received"}), 404
+    username = data.get("friend")
 
-    friend_username = data.get("friend")
-    if not friend_username:
-        return jsonify({"success": False, "message": "No username provided"}), 404
+    if not username:
+        return jsonify({"success": False, "message": "Username missing"}), 400
+    
+    db = get_db()
+    sender_id = session["user_id"]
+    user = db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+    
+    receiver_id = user["id"]
+
+    existing = db.execute("SELECT * FROM friend_requests WHERE sender_id = ? AND receiver_id = ? AND status = 'pending'", (sender_id, receiver_id)).fetchone()
+
+    if existing:
+        return jsonify({"success": False, "message": "Friend request already sent"}), 409
+    
+    db.execute("INSERT INTO friend_requests (sender_id, receiver_id) VALUES (?, ?)", (sender_id, receiver_id))
+    db.commit()
+
+    return jsonify({"success": True, "message": "Friend request sent"})
+    
+@app.route("/notifications")
+@login_required
+def notifications():
+    db = get_db()
+    user_id = session["user_id"]
+
+    requests = db.execute("SELECT fr.id, u.username as sender_username, fr.timestamp FROM friend_requests fr JOIN users u ON fr.sender_id = u.id WHERE fr.receiver_id = ? AND fr.status = 'pending' " \
+    "ORDER BY fr.timestamp DESC", (user_id,)).fetchall()
+
+    return jsonify([dict(row) for row in requests])
+
+@app.route("/respond_request", methods=["POST"])
+@login_required
+def respond_request():
+    data = request.get_json()
+    request_id = data.get("request_id")
+    action = data.get("action")
 
     db = get_db()
-
     user_id = session["user_id"]
-    friend_id = db.execute("SELECT id FROM users WHERE username = ?", (friend_username,)).fetchone()[0]
 
-    if not friend_id:
-        return jsonify({"success": False, "message": "User not found"}), 404
+    req = db.execute("SELECT * FROM friend_requests WHERE id = ? AND receiver_id = ?", (request_id, user_id)).fetchone()
 
+    if not req:
+        return jsonify({"success": False, "message": "Request not found"}), 404
     
-    db.execute("INSERT INTO friends (user_id, friend_id) VALUES (?, ?)", (user_id, friend_id))
+    if action == "accept":
+        db.execute("UPDATE friend_requests SET status = 'accepted' WHERE id = ?", (request_id,))
+        db.execute("INSERT INTO friends (user_id, friend_id) VALUES (?, ?)", (user_id, req["sender_id"]))
+        db.execute("INSERT INTO friends (user_id, friend_id) VALUES (?, ?)", (req["sender_id"], user_id))
+    else:
+        db.execute("UPDATE friend_requests SET status = 'declined' WHERE id = ?", (request_id,))
 
     db.commit()
-    return jsonify({"success": True, "message": "Friend added"})
+    return jsonify({"success": True})
 
 
 @socketio.on("join_game")
@@ -542,13 +581,13 @@ def game_timer(room):
 @app.context_processor
 def inject_user():
     db = get_db()
-    user_id = session["user_id"]
+    user_id = session.get("user_id")
 
     if user_id:
         user = db.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()
         if user:
             return {"logged_in_user": user["username"]}
-    return {}
+    return {"logged_in_user": None}
 
 
 if __name__ == "__main__":

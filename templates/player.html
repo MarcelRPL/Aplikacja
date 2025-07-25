@@ -167,16 +167,16 @@
         });
 
     function addFriend(username) {
-        fetch("/add_friend", {
+        fetch("/friend_request", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ friend: username})
+            body: JSON.stringify({ friend: username })
         })
         .then(response => response.json())
         .then(data => {
-            alert(data.messsage);
+            alert(data.message);
         });
     }    
     </script>
