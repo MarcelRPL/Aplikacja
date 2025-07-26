@@ -73,7 +73,7 @@
         <h6>Dictionary completion: {{ stats.completion }}%</h6>
     </div>
     <button onclick="addFriend('{{ username }}')">Add friend</button>
-    <button>Invite to a game</button>
+    <button id="invite-btn" data-username="{{ username }}">Invite to a game</button>
 </div>
 
 
@@ -179,5 +179,22 @@
             alert(data.message);
         });
     }    
+
+    $("#invite-btn").on("click", function () {
+        const opponent = $(this).data("username");
+
+        $.ajax({
+            url: "/game_invite",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ opponent: opponent }),
+            success: function (response) {
+                alert(response.message);
+            },
+            error: function (xhr) {
+                alert(xhr.responseJSON.message);
+            }
+        });
+    });
     </script>
 {% endblock %}

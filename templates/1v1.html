@@ -5,7 +5,18 @@
     $(document).ready(function () {
         const socket = io();
 
+        const inviteMode = "{{ invite_mode|default(false) }}";
+        const roomId = "{{ room_id|default('') }}";
         let room = null;
+
+        if (inviteMode) {
+            // Invited game
+            socket.emit("join_room", { room: roomId});
+        } else {
+            // Random matchmaking
+            socket.emit("join_game")
+        }
+
         let timeLeft = 30;
         let guessedWords = []
 

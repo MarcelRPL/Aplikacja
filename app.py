@@ -347,10 +347,17 @@ def notifications():
     db = get_db()
     user_id = session["user_id"]
 
-    requests = db.execute("SELECT fr.id, u.username as sender_username, fr.timestamp FROM friend_requests fr JOIN users u ON fr.sender_id = u.id WHERE fr.receiver_id = ? AND fr.status = 'pending' " \
-    "ORDER BY fr.timestamp DESC", (user_id,)).fetchall()
+    requests = db.execute("SELECT fr.id, u.username as sender_username, fr.timestamp, 'friend' AS type FROM friend_requests fr JOIN users u ON fr.sender_id = u.id" \
+    "WHERE fr.receiver_id = ? AND fr.status = 'pending'", (user_id,)).fetchall()
 
-    return jsonify([dict(row) for row in requests])
+    invites = db.execute("SELECT gi.id, u.username as sender_username, gi.timestamp, 'game' AS type FROM game_invites gi JOIN users u ON gi.sender_id = u.id" \
+    "WHERE gi.receiver_id = ? AND gi.status = 'pending'", (user_id,)).fetchall()
+
+    notifications = [dict(row) for row in requests] + [dict(row) for row in invites]
+
+    notifications.sort(key=lambda x: x["timestamp"], reverse=True)
+
+    return jsonify(notifications)
 
 @app.route("/respond_request", methods=["POST"])
 @login_required
@@ -376,6 +383,97 @@ def respond_request():
 
     db.commit()
     return jsonify({"success": True})
+
+@app.route("/game_invite", methods=["POST"])
+@login_required
+def game_invite():
+    data = request.get_json()
+    username = data.get("opponent")
+
+    if not username:
+        return jsonify({"success": False, "message": "Username missing"}), 400
+    
+    db = get_db()
+    sender_id = session["user_id"]
+
+    user = db.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+
+    if not user:
+        return jsonify({"success": False, "message": "User not found"}), 404
+    
+    receiver_id = user["id"]
+
+    if receiver_id == sender_id:
+        return jsonify({"success": False, "message": "Can't invite yourself"}), 400
+    
+    existing = db.execute("SELECT id FROM game_invites WHERE sender_id = ? AND receiver_id = ? AND status = 'pending'", (sender_id, receiver_id)).fetchone()
+
+    if existing:
+        return jsonify({"success": False, "message": "Invite already sent"}), 409
+    
+    db.execute("INSERT INTO game_invites (sender_id, receiver_id) VALUES (?, ?)", (sender_id, receiver_id))
+    db.commit()
+
+    return jsonify({"success": True, "message": "Game invite sent"})
+
+@app.route("/respond_invite", methods=["POST"])
+@login_required
+def respond_invite():
+    data = request.get_json()
+    invite_id = data.get("invite_id")
+    action = data.get("action")
+
+    db = get_db()
+    user_id = session["user_id"]
+
+    invite = db.execute("SELECT * FROM game_invites WHERE id = ? AND receiver_id = ?", (invite_id, user_id)).fetchone()
+
+    if not invite:
+        return jsonify({"success": False, "message": "Invite not found"}), 404
+    
+    if action == "accept":
+        db.execute("UPDATE game_invites SET status = 'accepted' WHERE id = ?", (invite_id,))
+    else:
+        db.execute("UPDATE game_invites SET status = 'declined' WHERE id = ?", (invite_id,))
+
+    db.commit()
+    return jsonify({"success": True})
+
+
+@app.route("/play/<room_id>")
+@login_required
+def play_room(room_id):
+    return render_template("1v1.html", room_id=room_id, invite_mode=True)
+
+
+@socketio.on("join_room")
+@login_required
+def join_room_event(data):
+    room = data.get("room")
+    sid = request.sid
+    user_id = session["user_id"]
+
+    sid_user_map[sid] = user_id
+    join_room(room)
+
+    if room not in games:
+        games[room] = {
+            "players": {sid: {"words": [], "score": 0}},
+            "letters": (random_letter(), random_letter()),
+            "started": False
+        }
+    else:
+        games[room]["players"][sid] = {"words": [], "score": 0}
+        games[room]["started"] = True
+
+        socketio.emit("start_game", {
+            "room": room,
+            "start_letter": games[room]["letters"][0],
+            "end_letter": games[room]["letters"][1],
+            "time": 30
+        }, room=room)
+
+        socketio.start_background_task(game_timer, room)
 
 
 @socketio.on("join_game")

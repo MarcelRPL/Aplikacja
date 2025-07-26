@@ -76,13 +76,23 @@
 
                     $list.empty();
                     data.forEach(function (req) {
-                        const $item = $(`<li class="mb-2">
-                                            <span>${req.sender_username}</span>
-                                            <button class="btn btn-sm btn-success accept-btn" data-id="${req.id}">✔</button>
-                                            <button class="btn btn-sm btn-danger decline-btn">✖</button>
-                                            </li>
-                                        `);
-                        $list.append($item);
+                        if (req.type === "friend") {
+                            $list.append(`
+                                <li class="mb-2">
+                                    <span>${req.sender_username}</span>
+                                    <button class="btn btn-sm btn-success accept-friend" data-id="${req.id}">✔</button>
+                                    <button class="btn btn-sm btn-danger decline-friend" data-id="${req.id}">✖</button>
+                                </li>
+                            `);
+                        } else if (req.type === "game") {
+                            $list.append(`
+                                <li class="mb-2">
+                                    <span>${req.sender_username} invited you to a game</span>
+                                    <button class="btn btn-sm btn-success accept-game" data-id="${req.id}">✔</button>
+                                    <button class="btn btn-sm btn-danger decline-game data-id="${req.id}">✖</button>
+                                </li>
+                            `);    
+                        }
                     });
                 });
             }
@@ -106,14 +116,40 @@
                     $("#notification-dropdown").toggle();
                 });
 
-                $("#notification-list").on("click", ".accept-btn", function () {
+                $("#notification-list").on("click", ".accept-friend", function () {
                     const id = $(this).data("id");
                     respondRequest(id, "accept");
                 });
 
-                $("#notification-list").on("click", ".decline-btn", function () {
+                $("#notification-list").on("click", ".decline-friend", function () {
                     const id = $(this).data("id");
                     respondRequest(id, "decline");
+                });
+
+                $("#notification-list").on("click", ".accept.game", function () {
+                    const id = $(this).data("id");
+                    $.ajax({
+                        url: "/respond_invite",
+                        method: "POST",
+                        contentType: "application/json",
+                        data: JSON.stringify({ invite_id: id, action: "accept"}),
+                        success: function () {
+                            fetchNotifications();
+                        }
+                    });
+                });
+
+                $("#notification-list").on("click", ".decline.game", function () {
+                    const id = $(this).data("id");
+                    $.ajax({
+                        url: "/respond_invite",
+                        method: "POST",
+                        contentType: "application/json",
+                        data: JSON.stringify({ invite_id: id, action: "decline"}),
+                        success: function () {
+                            fetchNotifications();
+                        }
+                    });
                 });
 
                 setInterval(fetchNotifications, 30000);
