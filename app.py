@@ -411,7 +411,9 @@ def game_invite():
     if existing:
         return jsonify({"success": False, "message": "Invite already sent"}), 409
     
-    db.execute("INSERT INTO game_invites (sender_id, receiver_id) VALUES (?, ?)", (sender_id, receiver_id))
+    room_id = f"room_{min(sender_id, receiver_id)}_{max(sender_id, receiver_id)}"
+
+    db.execute("INSERT INTO game_invites (sender_id, receiver_id, room_id) VALUES (?, ?, ?)", (sender_id, receiver_id, room_id))
     db.commit()
 
     return jsonify({"success": True, "message": "Game invite sent"})
@@ -432,7 +434,7 @@ def respond_invite():
         return jsonify({"success": False, "message": "Invite not found"}), 404
     
     if action == "accept":
-        db.execute("UPDATE game_invites SET status = 'accepted' WHERE id = ?", (invite_id,))
+        db.execute("UPDATE game_invites SET status = 'accepted' WHERE id = ?", (invite_id,))      
     else:
         db.execute("UPDATE game_invites SET status = 'declined' WHERE id = ?", (invite_id,))
 
@@ -446,80 +448,86 @@ def play_room(room_id):
     return render_template("1v1.html", room_id=room_id, invite_mode=True)
 
 
-@socketio.on("join_room")
-@login_required
-def join_room_event(data):
-    room = data.get("room")
-    sid = request.sid
-    user_id = session["user_id"]
-
-    sid_user_map[sid] = user_id
-    join_room(room)
-
-    if room not in games:
-        games[room] = {
-            "players": {sid: {"words": [], "score": 0}},
-            "letters": (random_letter(), random_letter()),
-            "started": False
-        }
-    else:
-        games[room]["players"][sid] = {"words": [], "score": 0}
-        games[room]["started"] = True
-
-        socketio.emit("start_game", {
-            "room": room,
-            "start_letter": games[room]["letters"][0],
-            "end_letter": games[room]["letters"][1],
-            "time": 30
-        }, room=room)
-
-        socketio.start_background_task(game_timer, room)
-
-
 @socketio.on("join_game")
 @login_required
-def join_game():
-    global waiting_player
+def join_game(data=None):
+        global waiting_player
+        sid = request.sid
 
-    with lock:
-        sid_user_map[request.sid] = session["user_id"]
+        with lock:
+            # INVITATION GAME
+            if data and "room_id" in data:
+                room_id = data["room_id"]
 
-        if waiting_player is None:
-            waiting_player = request.sid
-            emit("waiting", {"msg": "Waiting for another player..."}, room=request.sid)
-        else:
-            player1 = waiting_player
-            player2 = request.sid
-            waiting_player = None
+                # if it's the second player joining
+                if room_id in games:
+                    join_room(room_id, sid=sid)
 
-            # Tworzymy pokój
-            room = f"game_{player1}_{player2}"
-            join_room(room, sid=player1)
-            join_room(room, sid=player2)
-            
-            # Ustalamy litery
-            start = random_letter()
-            end = random_letter()
+                    start, end = games[room_id]["letters"]
+                    emit("start_game", {
+                        "room": room_id,
+                        "start_letter": start,
+                        "end_letter": end,
+                        "time": 30
+                    }, room=room_id)
 
-            # Tworzymy strukture danych dla danego pokoju
-            games[room] = {
-                "players": {player1: {"words": [], "score": 0},
-                            player2: {"words": [], "score": 0}},
-                "letters": (start, end),
-                "started": True,
-            }
+                    socketio.start_background_task(game_timer, room_id)
+                    print(f"Invitation game started: {room_id}")
+                
+                # First player sent and invite
+                else:
+                    join_room(room_id, sid=sid)
 
-            # Wysyłami wiadomość do serwera, aby rozpocząć grę i z jakimi danymi
-            emit("start_game", {
-                "room": room,
-                "start_letter": start,
-                "end_letter": end,
-                "time": 30
-            }, room=room)
+                    start = random_letter()
+                    end =  random_letter()
+                    games[room_id] = {
+                        "players": {sid: {"words": [], "score": 0}},
+                        "letters": (start, end),
+                        "started": False
+                    }
 
-            # Uruchom timer i po 30 sekundach uruchom funkcje end_game
-            socketio.start_background_task(game_timer, room)
-            print("Game started for:", session.get("user_id"))
+                    emit("waiting", {"msg": "Waiting for invited player..."}, room=sid)
+                    print(f"Invitation room created: {room_id}")
+
+                return
+
+            # Random matchmaking 
+            if waiting_player is None:
+                waiting_player = sid
+                emit("waiting", {"msg": "Waiting for another player..."}, room=sid)
+            else:
+                player1 = waiting_player
+                player2 = sid
+                waiting_player = None
+
+                # Tworzymy pokój
+                room_id = f"game_{player1}_{player2}"
+                join_room(room_id, sid=player1)
+                join_room(room_id, sid=player2)
+                
+                # Ustalamy litery
+                start = random_letter()
+                end = random_letter()
+
+                # Tworzymy strukture danych dla danego pokoju
+                games[room_id] = {
+                    "players": {player1: {"words": [], "score": 0},
+                                player2: {"words": [], "score": 0}},
+                    "letters": (start, end),
+                    "started": True,
+                }
+
+                # Wysyłami wiadomość do serwera, aby rozpocząć grę i z jakimi danymi
+                emit("start_game", {
+                    "room": room_id,
+                    "start_letter": start,
+                    "end_letter": end,
+                    "time": 30
+                }, room=room_id)
+
+                # Uruchom timer i po 30 sekundach uruchom funkcje end_game
+                socketio.start_background_task(game_timer, room_id)
+                print("Game started: {room_id}")
 
 
 @socketio.on("submit_word")
@@ -645,6 +653,16 @@ def end_game(room):
     del sid_user_map[players[0]]
     del sid_user_map[players[1]]
 
+
+@socketio.on("connect")
+def handle_connect():
+    user_id = session.get("user_id")
+    if user_id:
+        sid_user_map[request.sid] = user_id
+        print(f"User connected: SID={request.sid}, user_id={user_id}")
+    else:
+        print(f"Anonymous connection: SID={request.sid}")
+
 @socketio.on("disconnect")
 def handle_disconnect():
     global waiting_player
@@ -658,7 +676,7 @@ def handle_disconnect():
     user_id = sid_user_map.pop(sid, None)
 
     room_to_delete = None
-    for room, game in games.items():
+    for room, game in list(games.items()):
         if sid in game["players"]:
             del game["players"][sid]
 

@@ -89,7 +89,7 @@
                                 <li class="mb-2">
                                     <span>${req.sender_username} invited you to a game</span>
                                     <button class="btn btn-sm btn-success accept-game" data-id="${req.id}">✔</button>
-                                    <button class="btn btn-sm btn-danger decline-game data-id="${req.id}">✖</button>
+                                    <button class="btn btn-sm btn-danger decline-game" data-id="${req.id}">✖</button>
                                 </li>
                             `);    
                         }
@@ -126,7 +126,7 @@
                     respondRequest(id, "decline");
                 });
 
-                $("#notification-list").on("click", ".accept.game", function () {
+                $("#notification-list").on("click", ".accept-game", function () {
                     const id = $(this).data("id");
                     $.ajax({
                         url: "/respond_invite",
@@ -139,7 +139,7 @@
                     });
                 });
 
-                $("#notification-list").on("click", ".decline.game", function () {
+                $("#notification-list").on("click", ".decline-game", function () {
                     const id = $(this).data("id");
                     $.ajax({
                         url: "/respond_invite",
