@@ -188,8 +188,8 @@
             method: "POST",
             contentType: "application/json",
             data: JSON.stringify({ opponent: opponent }),
-            success: function (response) {
-                alert(response.message);
+            success: function (resp) {
+                window.location.href = `/play/${resp.room_id}`;
             },
             error: function (xhr) {
                 alert(xhr.responseJSON.message);

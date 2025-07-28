@@ -9,9 +9,9 @@
         const roomId = "{{ room_id|default('') }}";
         let room = null;
 
-        if (inviteMode) {
+        if (inviteMode && roomId) {
             // Invited game
-            socket.emit("join_room", { room: roomId});
+            socket.emit("join_game", { room_id: roomId});
         } else {
             // Random matchmaking
             socket.emit("join_game")
@@ -19,9 +19,6 @@
 
         let timeLeft = 30;
         let guessedWords = []
-
-        // Dołączenie do pokoju
-        socket.emit("join_game");
 
         // Czekanie na drugiego gracza
         socket.on("waiting", function (data) {

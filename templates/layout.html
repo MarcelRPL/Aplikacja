@@ -133,7 +133,18 @@
                         method: "POST",
                         contentType: "application/json",
                         data: JSON.stringify({ invite_id: id, action: "accept"}),
-                        success: function () {
+                        success: function (resp) {
+                            if (resp.success && resp.room_id) {
+                                window.location.href = `/play/${resp.room_id}`;
+                            }
+                            else {
+                                alert(resp.message || "Invite is no longer valid.");
+                                fetchNotifications();
+                            }
+
+                        },
+                        error: function (xhr) {
+                            alert(xhr.responseJSON?.message || "Error responding to invite.");
                             fetchNotifications();
                         }
                     });

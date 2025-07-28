@@ -347,10 +347,10 @@ def notifications():
     db = get_db()
     user_id = session["user_id"]
 
-    requests = db.execute("SELECT fr.id, u.username as sender_username, fr.timestamp, 'friend' AS type FROM friend_requests fr JOIN users u ON fr.sender_id = u.id" \
+    requests = db.execute("SELECT fr.id, u.username as sender_username, fr.timestamp, 'friend' AS type FROM friend_requests fr JOIN users u ON fr.sender_id = u.id " \
     "WHERE fr.receiver_id = ? AND fr.status = 'pending'", (user_id,)).fetchall()
 
-    invites = db.execute("SELECT gi.id, u.username as sender_username, gi.timestamp, 'game' AS type FROM game_invites gi JOIN users u ON gi.sender_id = u.id" \
+    invites = db.execute("SELECT gi.id, u.username as sender_username, gi.timestamp, 'game' AS type FROM game_invites gi JOIN users u ON gi.sender_id = u.id " \
     "WHERE gi.receiver_id = ? AND gi.status = 'pending'", (user_id,)).fetchall()
 
     notifications = [dict(row) for row in requests] + [dict(row) for row in invites]
@@ -416,7 +416,7 @@ def game_invite():
     db.execute("INSERT INTO game_invites (sender_id, receiver_id, room_id) VALUES (?, ?, ?)", (sender_id, receiver_id, room_id))
     db.commit()
 
-    return jsonify({"success": True, "message": "Game invite sent"})
+    return jsonify({"success": True, "message": "Game invite sent", "room_id": room_id})
 
 @app.route("/respond_invite", methods=["POST"])
 @login_required
@@ -433,13 +433,17 @@ def respond_invite():
     if not invite:
         return jsonify({"success": False, "message": "Invite not found"}), 404
     
+    if invite["status"] != "pending":
+        return jsonify({"success": False, "message": "Invite expired or canceled"}), 400
+    
     if action == "accept":
-        db.execute("UPDATE game_invites SET status = 'accepted' WHERE id = ?", (invite_id,))      
+        db.execute("UPDATE game_invites SET status = 'accepted' WHERE id = ?", (invite_id,))
+        db.commit()
+        return jsonify({"success": True, "room_id": invite["room_id"]})      
     else:
         db.execute("UPDATE game_invites SET status = 'declined' WHERE id = ?", (invite_id,))
-
-    db.commit()
-    return jsonify({"success": True})
+        db.commit()
+        return jsonify({"success": True, "message": "Invite declined"})
 
 
 @app.route("/play/<room_id>")
@@ -447,12 +451,12 @@ def respond_invite():
 def play_room(room_id):
     return render_template("1v1.html", room_id=room_id, invite_mode=True)
 
-
 @socketio.on("join_game")
 @login_required
 def join_game(data=None):
         global waiting_player
         sid = request.sid
+        user_id = session["user_id"]
 
         with lock:
             # INVITATION GAME
@@ -462,6 +466,8 @@ def join_game(data=None):
                 # if it's the second player joining
                 if room_id in games:
                     join_room(room_id, sid=sid)
+                    games[room_id]["players"][sid] = {"user_id": user_id, "words": [], "score": 0}
+                    games[room_id]["started"] = True
 
                     start, end = games[room_id]["letters"]
                     emit("start_game", {
@@ -481,7 +487,7 @@ def join_game(data=None):
                     start = random_letter()
                     end =  random_letter()
                     games[room_id] = {
-                        "players": {sid: {"words": [], "score": 0}},
+                        "players": {sid: {"user_id": user_id, "words": [], "score": 0}},
                         "letters": (start, end),
                         "started": False
                     }
@@ -527,7 +533,7 @@ def join_game(data=None):
 
                 # Uruchom timer i po 30 sekundach uruchom funkcje end_game
                 socketio.start_background_task(game_timer, room_id)
-                print("Game started: {room_id}")
+                print(f"Game started: {room_id}")
 
 
 @socketio.on("submit_word")
@@ -678,6 +684,15 @@ def handle_disconnect():
     room_to_delete = None
     for room, game in list(games.items()):
         if sid in game["players"]:
+
+            if len(game["players"]) == 1 and not game.get("started", False):
+                db = get_db()
+                db.execute("UPDATE game_invites SET status='canceled' WHERE room_id = ? AND status = 'pending'", (room,))
+                db.commit()
+
+                room_to_delete = room
+                print(f"Invite canceled: {room}")   
+
             del game["players"][sid]
 
             for other_sid in game["players"]:
