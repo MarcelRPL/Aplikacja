@@ -66,6 +66,35 @@ Game
                 {% endif %}    
                 </tbody>
         </table>
+        <h3>Friends List</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Total games</th>
+                    <th>W/D/L</th>
+                    <th>WR against</th>
+                    <th>Invite to a game</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if friends %}
+                    {% for friend in friends %}
+                    <tr>
+                        <td style="text-align: center">{{ friend.username }}</td>
+                        <td style="text-align: center">{{ friend.total }}</td>
+                        <td style="text-align: center">{{ friend.wins }}/{{ friend.draws }}/{{ friend.losses }}</td>         
+                        <td style="text-align: center">{{ friend.winrate }}</td>
+                        <td style="text-align: center"><button class="invite-btn" data-username="{{ friend.username }}">Invite</button></td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                <tr>
+                    <td colspan="3">No friends added yet.</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
     </div>
 
     <div id="summary" class="modal hidden">
@@ -156,6 +185,23 @@ Game
                 $("#summary-1v1").addClass("hidden")
             });
         });
+
+        $(".invite-btn").on("click", function () {
+        const opponent = $(this).data("username");
+
+        $.ajax({
+            url: "/game_invite",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ opponent: opponent }),
+            success: function (resp) {
+                window.location.href = `/play/${resp.room_id}`;
+            },
+            error: function (xhr) {
+                alert(xhr.responseJSON.message);
+            }
+        });
+    });
     </script>
 
     {% endblock %}

@@ -49,8 +49,29 @@ def index():
         game_dict["opponent_username"] = opponent_username
         versus.append(game_dict)
    
+    all_friends= db.execute("SELECT * FROM friends WHERE user_id = ?", (session["user_id"],))
+
+    friends = []
+    for friend in all_friends:
+        wins = db.execute("SELECT COUNT(result) FROM game WHERE user_id = ? AND opponent_id = ? AND result = 'win'", (session["user_id"], friend["friend_id"])).fetchone()[0]
+        losses = db.execute("SELECT COUNT(result) FROM game WHERE user_id = ? AND opponent_id = ? AND result = 'loss'", (session["user_id"], friend["friend_id"])).fetchone()[0]    
+        draws = db.execute("SELECT COUNT(result) FROM game WHERE user_id = ? and opponent_id = ? AND result = 'draw'", (session["user_id"], friend["friend_id"])).fetchone()[0]   
+        winrate = round(((wins + 0.5 * draws) / (wins + losses + draws)) * 100, 2)
+
+        friend_row = db.execute("SELECT username FROM users WHERE id = ?", (friend["friend_id"],)).fetchone()
+        friend_username = friend_row["username"]
+
+        friend_dict = dict(friend)
+        friend_dict["total"] = wins + losses + draws
+        friend_dict["wins"] = wins
+        friend_dict["losses"] = losses
+        friend_dict["draws"] = draws
+        friend_dict["winrate"] = winrate
+        friend_dict["username"] = friend_username
+        friends.append(friend_dict)
+
     
-    return render_template("index.html", solos=solos, versus=versus)
+    return render_template("index.html", solos=solos, versus=versus, friends=friends)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -681,29 +702,42 @@ def handle_disconnect():
 
     user_id = sid_user_map.pop(sid, None)
 
-    room_to_delete = None
     for room, game in list(games.items()):
         if sid in game["players"]:
-
-            if len(game["players"]) == 1 and not game.get("started", False):
-                db = get_db()
-                db.execute("UPDATE game_invites SET status='canceled' WHERE room_id = ? AND status = 'pending'", (room,))
-                db.commit()
-
-                room_to_delete = room
-                print(f"Invite canceled: {room}")   
-
-            del game["players"][sid]
-
-            for other_sid in game["players"]:
-                socketio.emit("opponent_disconnected", {}, to=other_sid)
-
-            if not game["players"]:
-                room_to_delete = room
+            if not game.get("started", False):
+                socketio.start_background_task(handle_disconnect_with_delay, sid, user_id, room)
+            else:
+                cleanup_disconnected_players(sid, room, started=True)
             break
+
+def handle_disconnect_with_delay(sid, user_id, room):
+    socketio.sleep(5)
+
+    if user_id in sid_user_map.values():
+        print(f"User {user_id} reconnected - skipping invite cleanup")
+        return
     
-    if room_to_delete:
-        del games[room_to_delete]
+    cleanup_disconnected_players(sid, room, started=False)
+
+def cleanup_disconnected_players(sid, room, started):
+    game = games.get(room)
+    if not game:
+        return
+
+    if not started:
+        db = get_db()
+        db.execute("UPDATE game_invites SET status = 'canceled' WHERE room_id = ? AND status = 'pending'", (room,))
+        db.commit()
+        print(f"Invite canceled due to disconnect: {room}")
+
+    if sid in game["players"]:
+        del game["players"][sid]
+
+    for other_sid in game["players"]:
+        socketio.emit("opponent_disconnected", {}, to=other_sid)
+
+    if not game["players"]:
+        del games[room]
 
 def game_timer(room):
     socketio.sleep(30)
