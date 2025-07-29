@@ -5,22 +5,35 @@ Log In
 {% endblock %}
 
 {% block main %}
-<form action="/login" method="post">
-    <input autofocus autocomplete="off" name="username" placeholder="Username" type="text">
-    {% if errors.get("username") %}
-    <div>
-        {{ errors["username"] }}
+<div class="container d-flex flex-column justify-content-center align-items-center min-vh-100">
+
+    <h1 class="game-title mb-4 text-center">Filler Words</h1>
+
+    <div class="card p-4 login-card">
+        <form action="/login" method="post" class="text-center">
+            <div class="mb-3">
+                <input autofocus autocomplete="off" name="username" placeholder="Username" type="text" class="form-control input-chalk">
+                {% if errors.get("username") %}
+                <div class="text-danger small mt-1">
+                    {{ errors["username"] }}
+                </div>
+                {% endif %}
+            </div>
+            <div class="mb-3">
+                <input name="password" placeholder="Password" type="password" class="form-control input-chalk">
+                {% if errors.get("password") %}
+                <div class="text-danger small mt-1">
+                    {{ errors["password"] }}
+                </div>
+                {% endif %}
+            </div>
+            <button type="submit" class="btn button-chalk w-100 mb-3">Log In</button>
+        </form>
+        <div class="text-center mt-2">
+            <h5 class="text-highlight">You don't have an account?</h5>
+            <a href="/register" class="btn btn-outline-light mt-1">Register</a>
+        </div>
     </div>
-    {% endif %}
-    <input name="password" placeholder="Password" type="password">
-    {% if errors.get("password") %}
-    <div>
-        {{ errors["password"] }}
-    </div>
-    {% endif %}
-    <button type="submit">Log In</button>
-</form>
-<h4>Do you need to register?</h4>
-<a href="/register">Register</a>
+</div>
 
 {% endblock %}

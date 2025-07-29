@@ -21,3 +21,173 @@
 .hidden {
     display: none;
 }
+
+body {
+    background-color: #1e1e1e;
+    color: #f1f1f1;
+    font-family: 'Special Elite', monospace;
+    padding: 20px
+}
+
+h1, h2, h3, h4 {
+    color: #d2f5e3;
+    text-shadow: 1px 1px #000;
+}
+
+.background-letters {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.background-letters::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image:
+        repeating-radial-gradient(rgba(255, 255, 255, 0.02) 0.5px, transparent 2px),
+        repeating-radial-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 4px);
+    background-size: 200px 200px;
+}
+
+.bg-letter {
+    position: absolute;
+    font-family: 'Special Elite', monospace;
+    font-size: 3rem;
+    color: rgba(255, 255, 255, 0.03);
+    user-select: none;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.button-chalk {
+    background-color: transparent;
+    border: 2px dashed #d2f5e3;
+    color: #f1f1f1;
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-family: 'Special Elite', monospace;
+    transition: all 0.3s;
+}
+
+.button-chalk:hover {
+    background-color: #d2f5e3;
+    color: #1e1e1e;
+}
+
+.card {
+    background-color: #2b3a1a;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+    margin-bottom: 20px;
+}
+
+.chalk-navbar {
+    background-color: #2e3b24;
+    border-bottom: 2px dashed #d2f5e3;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.game-title {
+    font-size: 3rem;
+    color: #d2f5e3;
+    text-shadow: 2px 2px #000;
+}
+
+.game-title-small {
+    font-family: 'Special Elite', monospace;
+    font-size: 1.5rem;
+    color: #d2f5e3;
+    text-decoration: none;
+}
+
+.game-title-small:hover {
+    color: #f1f1f1;
+    text-shadow: 1px 1px #000;
+}
+
+.input-chalk {
+    background-color: transparent;
+    border: 2px dashed #d2f5e3;
+    color: #f1f1f1;
+    font-family: 'Special Elite', monospace;
+}
+
+.input-chalk::placeholder {
+    color: #d2f5e3;
+}
+
+.login-card {
+    background-color: #2b3a1a;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
+    width: 100%;
+    max-width: 400px;
+}
+
+.navbar .nav-link {
+    color: #f1f1f1;
+    font-family: 'Special Elite', monospace;
+    font-size: 1rem;
+    text-decoration: none;
+}
+
+.navbar .nav-link:hover {
+    color: #d2f5e3;
+}
+
+.notification-dropdown-custom {
+    background-color: #3e5032;
+    border: 1px dashed #d2f5e3;
+    color: #f1f1f1;
+    min-width: 250px;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1000;
+}
+
+.notification-dropdown-custom h6 {
+    font-family: 'Special Elite', monospace;
+    color: #d2f5e3;
+}
+
+.notification-dropdown-custom li {
+    font-size: 0.9rem;
+}
+
+.notification-dropdown-custom button {
+    font-family: 'Special Elite', monospace;
+    margin-left: 0.5rem;
+}
+
+.text-highlight {
+    color: #d2f5e3;
+    font-family: 'Special Elite', monospace;
+    font-size: 1.1rem;
+    text-align: center;
+}
+
+.word-display {
+    font-size: 2rem;
+    letter-spacing: 0.3em;
+    text-align: center;
+    margin-top: 30px;
+}
+
+@media (max-width: 768px) {
+    .word-display {
+        font-size: 1.5rem;
+        letter-spacing: 0.2em;
+    }
+}

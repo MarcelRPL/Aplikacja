@@ -9,63 +9,6 @@ Game
         <a href="/solo"><button>Solo</button></a>
         <a href="/1v1"><button>1v1</button></a>
     </div>
-    <div>
-        <h3>Solo Match History:</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th style="text-align: center">Date</th>
-                    <th style="text-align: center">Letters</th>
-                    <th style="text-align: center">Score</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if solos %}
-                    {% for game in solos %}
-                    <tr class="game-row" data-id="{{game.id}}">
-                        <td style="text-align: center">{{ game.date }}</td>
-                        <td style="text-align: center">{{ game.start }}___{{ game.end }}</td>
-                        <td style="text-align: center">{{ game.score }}</td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="3">No solo games yet.</td>
-                    </tr>
-                {% endif %}    
-                </tbody>
-        </table>
-        <h3>1v1 Match History:</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th style="text-align: center">Date</th>
-                    <th style="text-align: center">Letters</th>
-                    <th style="text-align: center">Opponent</th>
-                    <th style="text-align: center">Score</th>
-                    <th style="text-align: center">Opponent's Score</th>
-                    <th style="text-align: center">Result</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if versus %}
-                    {% for game in versus %}
-                    <tr class="game-row2" data-match_id="{{game.match_id}}" data-user_id="{{game.user_id}}">
-                        <td style="text-align: center">{{ game.date }}</td>
-                        <td style="text-align: center">{{ game.start }}___{{ game.end }}</td>
-                        <td style="text-align: center">{{ game.opponent_username }}</td>
-                        <td style="text-align: center">{{ game.score }}</td>
-                        <td style="text-align: center">{{ game.opponent_score }}</td>
-                        <td style="text-align: center">{{ game.result }}</td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="3">No 1v1 games yet.</td>
-                    </tr>
-                {% endif %}    
-                </tbody>
-        </table>
         <h3>Friends List</h3>
         <table>
             <thead>
@@ -124,68 +67,6 @@ Game
     </div>
 
     <script>
-        $(document).ready(function () {
-            $(".game-row").on("click", function () {
-                const gameId = $(this).data("id");
-
-                $.get(`/game/${gameId}`, function (data) {
-                    $("#summary-start").text(data.start);
-                    $("#summary-end").text(data.end);
-                    $("#summary-score").text(data.score);
-                    
-                    $("#summary-words").empty();
-                    for (let word of data.words) {
-                        $("#summary-words").append(`<li>${ word }</li>`);
-                    }
-                
-                    $("#summary").removeClass("hidden");
-                });      
-            });
-
-
-            $("#close").on("click", function () {
-                $("#summary").addClass("hidden");
-            });
-
-            $(".game-row2").on("click", function () {
-                const matchId = $(this).data("match_id");
-                const userId = $(this).data("user_id")
-
-                $.get(`/match/${matchId}?viewer_id=${userId}`, function (data) {
-                    $("#summary-start-1v1").text(data.start)
-                    $("#summary-end-1v1").text(data.end)
-                    $("#player-score").text(data.score)
-                    $("#opponent-score").text(data.opponent_score)
-                    
-                    $("#player-words").empty();
-                    for (let word of data.words) {
-                        $("#player-words").append(`<li>${ word }</li>`)
-                    }
-                    
-                    $("#opponent-words").empty();
-                    for (let word of data.opponent_words) {
-                        $("#opponent-words").append(`<li>${ word }</li>`)
-                    }
-
-                    if (data.score > data.opponent_score) {
-                        $("#result").text("Win")
-                    }
-                    else if (data.score < data.opponent_score) {
-                        $("#result").text("Loss")
-                    }
-                    else {
-                        $("#result").text("Draw")
-                    }
-
-                    $("#summary-1v1").removeClass("hidden")
-                });
-            });
-
-            $("#close-1v1").on("click", function () {
-                $("#summary-1v1").addClass("hidden")
-            });
-        });
-
         $(".invite-btn").on("click", function () {
         const opponent = $(this).data("username");
 
