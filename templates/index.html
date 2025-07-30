@@ -1,70 +1,100 @@
 {% extends "layout.html" %}
 
 {% block title %}
-Game
+Filler Words
 {% endblock %}
 
 {% block main %}
-    <div>
-        <a href="/solo"><button>Solo</button></a>
-        <a href="/1v1"><button>1v1</button></a>
-    </div>
-        <h3>Friends List</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Total games</th>
-                    <th>W/D/L</th>
-                    <th>WR against</th>
-                    <th>Invite to a game</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% if friends %}
-                    {% for friend in friends %}
-                    <tr>
-                        <td style="text-align: center">{{ friend.username }}</td>
-                        <td style="text-align: center">{{ friend.total }}</td>
-                        <td style="text-align: center">{{ friend.wins }}/{{ friend.draws }}/{{ friend.losses }}</td>         
-                        <td style="text-align: center">{{ friend.winrate }}</td>
-                        <td style="text-align: center"><button class="invite-btn" data-username="{{ friend.username }}">Invite</button></td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                <tr>
-                    <td colspan="3">No friends added yet.</td>
-                </tr>
-                {% endif %}
-            </tbody>
-        </table>
-    </div>
+    <div class="container my-4">
+        <div class="row">
+            <div class=" col-lg-8 mb-4">
+                <div class="text-center mb-3">
+                    <h2 class="game-title-small">Play:</h2>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="d-grid mt-3 mb-4">
+                            <a href="/solo" class="button-chalk btn-lg text-center">Solo</a>
+                        </div>
 
-    <div id="summary" class="modal hidden">
-        <div class="modal-content">
-            <h2>Summary</h2>
-            <p style="font-weight: bold"><span id="summary-start"></span>____<span id="summary-end"></span></p>
-            <p><strong>Final score:</strong><span id="summary-score"></span></p>
-            <p><strong>Guessed words:</strong></p>
-            <ul id="summary-words"></ul>
-            <button id="close">Close</button>
-        </div>
-    </div>
+                        <div class="card chalk-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Rules</h5>
+                                <ul>
+                                    <li>Guess a word with provided start and end letters</li>
+                                    <li>You have 30 seconds to guess as many as possible</li>
+                                    <li>Word must be at leas 6 letters long</li>
+                                    <li>Word must be in the <a>dictionary</a></li>
+                                    <li>Points are rewarded depending on the used letters</li>
+                                </ul>
+                            </div>
+                        </div>                       
+                    </div>
 
-    <div id="summary-1v1" class="modal hidden">
-        <div class="modal-content">
-            <h2>Summary</h2>
-            <p><strong>Result</strong><span id="result"></span></p>
-            <p style="font-weight: bold"><span id="summary-start-1v1"></span>____<span id="summary-end-1v1"></span></p>
-            <p><strong>Final score:</strong><span id="player-score"></span></p>
-            <p><strong>Guessed words:</strong></p>
-            <ul id="player-words"></ul>
-            <p><strong>Opponent's score:</strong><span id="opponent-score"></span></p>
-            <p><strong>Opponent's words:</strong></p>
-            <ul id="opponent-words"></ul>
-            <button id="close-1v1">Close</button>
+                    <div class="col-md-6 mb-3">
+                        <div class="d-grid mt-3 mb-4">
+                            <a href="/1v1" class="button-chalk btn-lg text-center">Player vs Player</a>
+                        </div>
+
+                        <div class="card chalk-card">
+                            <div class="card-body">
+                                <h5 class="card-title">Point Table</h5>
+                                <table class="table table-sm table-chalk table-borderless mb-0">
+                                    <tbody>
+                                        <tr><td><strong>1p:</strong></td><td>A, E, I, O, U, L, N, S, T, R</td></tr>
+                                        <tr><td><strong>2p:</strong></td><td>D, G</td></tr>
+                                        <tr><td><strong>3p:</strong></td><td>B, C, M, P</td></tr>
+                                        <tr><td><strong>4p:</strong></td><td>F, H, V, W, Y</td></tr>
+                                        <tr><td><strong>5p:</strong></td><td>K</td></tr>
+                                        <tr><td><strong>8p:</strong></td><td>J, X</td></tr>
+                                        <tr><td><strong>1p:</strong></td><td>Q, Z</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>   
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card chalk-card">
+                    <div class="card-body">
+                        <h5 class="card-title text-center">Friends List</h5>
+                        <div class="table-responsive overflow-auto">
+                            <table class="table table-sm text-center table-chalk">
+                                <thead class="table-chalk">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Matches</th>
+                                        <th>W/D/L</th>
+                                        <th>WR</th>
+                                        <th>Invite</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if friends %}
+                                        {% for friend in friends %}
+                                        <tr>
+                                            <td style="text-align: center">{{ friend.username }}</td>
+                                            <td style="text-align: center">{{ friend.total }}</td>
+                                            <td style="text-align: center">{{ friend.wins }}/{{ friend.draws }}/{{ friend.losses }}</td>         
+                                            <td style="text-align: center">{{ friend.winrate }}%</td>
+                                            <td style="text-align: center"><button class="invite-btn button-chalk-small btn-outline-success" data-username="{{ friend.username }}">Invite</button></td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="5">No friends added yet.</td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-    </div>
+    </div>   
 
     <script>
         $(".invite-btn").on("click", function () {

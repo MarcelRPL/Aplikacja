@@ -6,98 +6,117 @@
 
 {% block main %}
 <div>
-    <div>
-        <h3>Palyer Info</h3>
-        <p id="username">{{ username }}</p>
-        <p id="matches">{{ stats.versus }}</p>
-        <p id="winrate">W:{{ stats.wins }} L:{{ stats.losses }} D: {{ stats.draws }} Winrate:{{ stats.winrate }}%</p>
-        <p id="highscore">Highscore (1v1): {{ stats.highscore }} ({{ stats.highscore_versus }})</p>
-    </div>
-    <div>
-        <div>
-            <h3>Match history Solo</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Letters</th>
-                        <th>Score</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if solos %}
-                        {% for solo in solos %}
-                        <tr class="game-row" data-id="{{solo.id}}">
-                            <td>{{ solo.date }}</td>
-                            <td>{{ solo.start }}___{{ solo.end }}</td>
-                            <td>{{ solo.score }}</td>
-                        </tr>
-                        {% endfor %}
-                    {% endif %}
-                </tbody>
-            </table>
+        <div class="player-stats-box chalk-card text-light mb-4 mt-3">
+            <h2 class="text-center mb-3 mt-2">{{ username }}</h2>
+            <div class="row text-center">
+                <div class="col-sm"><strong>Total Matches:</strong> {{ stats.versus }}</div>
+                <div class="col-sm"><strong>Wins: </strong>{{ stats.wins }} / <strong>Losses: </strong> {{ stats.losses }} / <strong>Draws: </strong> {{ stats.draws }}</div>
+                <div class="col-sm"><strong>Winrate: </strong> {{ stats.winrate }}%</div>
+                <div class="col-sm"><strong>Highscore (PvP): </strong> {{ stats.highscore }} ({{ stats.highscore_versus }})</div>
+            </div>
         </div>
-        <div>
-            <h3>Match histori 1v1:</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Letters</th>
-                        <th>Opponent</th>
-                        <th>Your Score</th>
-                        <th>Opponents Score</th>
-                        <th>Result</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if versus %}
-                        {% for game in versus %}
-                        <tr class="game-row2" data-match_id="{{game.match_id}}" data-user_id="{{game.user_id}}">
-                            <td>{{ game.date }}</td>
-                            <td>{{ game.start }}___{{ game.end }}</td>
-                            <td>{{ opponent }}</td>
-                            <td>{{ game.score }}</td>
-                            <td>{{ game.opponent_score }}</td>
-                            <td>{{ game.result }}</td>
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="chalk-card p-3 h-100">
+                <h4 class="text-center">Match history Solo</h4>
+                <table class="table table-sm text-light table-borderless table-chalk w-100">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Letters</th>
+                            <th>Score</th>
                         </tr>
-                        {% endfor %}
-                    {% endif %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {% if solos %}
+                            {% for solo in solos %}
+                            <tr class="game-row" data-id="{{solo.id}}">
+                                <td>{{ solo.date }}</td>
+                                <td>{{ solo.start }}___{{ solo.end }}</td>
+                                <td>{{ solo.score }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td class="text-center" colspan="3">No Solo games played yet</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>    
+        </div>
+        <div class="col-md-6 mb-4">
+            <div class="chalk-card p-3 h-100">
+                <h4 class="text-center">Match histori 1v1:</h4>
+                <table class="table table-sm text-light table-borderless table-chalk w-100">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Letters</th>
+                            <th>Opponent</th>
+                            <th>Your Score</th>
+                            <th>Opponents Score</th>
+                            <th>Result</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if versus %}
+                            {% for game in versus %}
+                            <tr class="game-row2" data-match_id="{{game.match_id}}" data-user_id="{{game.user_id}}">
+                                <td>{{ game.date }}</td>
+                                <td>{{ game.start }}___{{ game.end }}</td>
+                                <td>{{ game.opponent_username }}</td>
+                                <td>{{ game.score }}</td>
+                                <td>{{ game.opponent_score }}</td>
+                                <td>{{ game.result }}</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                        <tr>
+                            <td class="text-center" colspan="6">No PvP matches played yet</td>
+                        </tr>    
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-    <div> 
-        <h3>Achievements</h3>
-        <h5>Used words {{ stats.word_count }}/{{ stats.valid }}</h5>
-        <h6>Dictionary completion: {{ stats.completion }}%</h6>
-    </div>
-</div>
 
+    <div class="chalk-card p-3 text-light text-center mb-4">
+        <h4>Achievements</h4>
+        <p>Used words: {{ stats.word_count }}/{{ stats.valid }}</p>
+        <p>Dictionary completion: {{ stats.completion }}%</p>
+    </div>
 
     <div id="summary" class="modal hidden">
-        <div class="modal-content">
+        <div class="modal-content chalk-card text-light p-4">
             <h2>Summary</h2>
-            <p style="font-weight: bold"><span id="summary-start"></span>____<span id="summary-end"></span></p>
+            <p class="fs-5"><span id="summary-start"></span>____<span id="summary-end"></span></p>
             <p><strong>Final score:</strong><span id="summary-score"></span></p>
             <p><strong>Guessed words:</strong></p>
             <ul id="summary-words"></ul>
-            <button id="close">Close</button>
+            <button id="close" class="button-chalk mt-3">Close</button>
         </div>
     </div>
 
     <div id="summary-1v1" class="modal hidden">
-        <div class="modal-content">
-            <h2>Summary</h2>
-            <p><strong>Result</strong><span id="result"></span></p>
+        <div class="modal-content chalk-card text-light p-4">
+            <h2 class="mb-3 text-center">Match Summary</h2>
+            <h4 class="text-center mb-4" id="result"></h4>
             <p style="font-weight: bold"><span id="summary-start-1v1"></span>____<span id="summary-end-1v1"></span></p>
-            <p><strong>Final score:</strong><span id="player-score"></span></p>
-            <p><strong>Guessed words:</strong></p>
-            <ul id="player-words"></ul>
-            <p><strong>Opponent's score:</strong><span id="opponent-score"></span></p>
-            <p><strong>Opponent's words:</strong></p>
-            <ul id="opponent-words"></ul>
-            <button id="close-1v1">Close</button>
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Your score: <span id="player-score"></span></h5>
+                    <ul id="player-words"></ul>
+                </div>
+                <div class="col-md-6">
+                    <h5>Opponent's score: <span id="opponent-score"></span></h5>
+                    <ul id="opponent-words"></ul>
+                </div>
+            </div>
+            <div class="text-center">       
+                <button id="close-1v1" class="button-chalk mt-3">Close</button>
+            </div> 
         </div>
     </div>
 

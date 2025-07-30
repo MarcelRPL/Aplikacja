@@ -9,6 +9,11 @@
     z-index: 999;
 }
 
+.modal h4#result {
+    font-size: 1.8rem;
+    color: #a3f5a8;
+}
+
 .modal-content {
     background: white;
     padding: 2em;
@@ -16,6 +21,20 @@
     max-width: 400px;
     width: 90%;
     text-align: center;    
+}
+
+.modal-content.chalk-card {
+    max-width: 800px;
+    margin: auto;
+}
+
+.modal-content ul,
+#summary-words,
+#player-words,
+#opponent-words {
+    list-style-type: none;
+    padding-left: 0;
+    margin: 0;
 }
 
 .hidden {
@@ -76,9 +95,25 @@ h1, h2, h3, h4 {
     border-radius: 5px;
     font-family: 'Special Elite', monospace;
     transition: all 0.3s;
+    text-decoration: none;
 }
 
 .button-chalk:hover {
+    background-color: #d2f5e3;
+    color: #1e1e1e;
+}
+
+.button-chalk-small {
+    background-color: transparent;
+    border: 2px dashed #d2f5e3;
+    color: #f1f1f1;
+    padding: 2px 4px;
+    border-radius: 2px;
+    font-family: 'Special Elite', monospace;
+    transition: all 0.3s;
+    text-decoration: none;
+}
+.button-chalk-small:hover {
     background-color: #d2f5e3;
     color: #1e1e1e;
 }
@@ -89,6 +124,27 @@ h1, h2, h3, h4 {
     border-radius: 10px;
     box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
     margin-bottom: 20px;
+}
+
+.chalk-card {
+    background-color: #142104;
+    border: 2px dashed #d2f5e3;
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.05);
+    color: #f1f1f1;
+}
+
+.chalk-card table {
+    color: #f1f1f1;
+}
+
+.chalk-card .car-title {
+    color: #d2f5e3;
+    text-shadow: 1px 1px #000;
+}
+
+.chalk-card .card-body {
+    padding: 1.5rem;
 }
 
 .chalk-navbar {
@@ -169,6 +225,34 @@ h1, h2, h3, h4 {
 .notification-dropdown-custom button {
     font-family: 'Special Elite', monospace;
     margin-left: 0.5rem;
+}
+
+.player-stat-box {
+    padding: 20px;
+    border: 2px dashed #b0eac8;
+    border-radius: 12px;
+    background-color: rgba(10, 40, 10, 0.95);
+    margin-bottom: 30px
+}
+
+.table-chalk {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+}
+
+.table-chalk thead {
+    background-color: #142104;
+    color: #d2f5e3;
+    font-family: 'Special Elite', monospace;
+}
+
+.table-chalk td, .table-chalk th {
+    border-top: none;
+    font-family: 'Special Elite', monospace;
+    background-color: transparent;
+    color: #f1f1f1;
+    padding: 0.3rem;
 }
 
 .text-highlight {
