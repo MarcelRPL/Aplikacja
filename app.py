@@ -157,7 +157,7 @@ def register():
                 db.commit()
                 return redirect("/")
             except sqlite3.IntegrityError:
-                errors["username"] = "Username unavialable"
+                errors["username"] = "Username unavailable"
 
            
     return render_template("register.html", errors=errors)
@@ -189,7 +189,6 @@ def solo():
     session["start_letter"] = start
     session["end_letter"] = end
 
-    print(f"Found valid pair: {start}-{end}")
     return render_template("solo.html", start=start, end=end)
 
 @app.route("/check_word", methods=["POST"])
@@ -215,7 +214,7 @@ def save_game():
     data = request.get_json()
 
     if not all (k in data for k in ("start", "end", "score", "words")):
-        return jsonify({"error": "Incomplete data"}), 400
+        return jsonify({"success": False, "message": "Incomplete data"}), 400
     # Wstaw pobrane dane w tabele "game" oraz ustal jaki to game_id
     db = get_db()
     game_id = db.execute("INSERT INTO game (user_id, start, end, score, mode, date) VALUES (?, ?, ?, ?, ?, ?)", (session["user_id"], data["start"], data["end"], data["score"], "solo", datetime.now().strftime("%Y-%m-%d"))).lastrowid
@@ -225,7 +224,6 @@ def save_game():
         db.execute("INSERT INTO words (game_id, user_id, word) VALUES (?, ?, ?)", (game_id, session["user_id"], word))
         
     db.commit()
-    print("SESSION:", session)
     return jsonify({"success": True, "game_id": game_id})
 
 
@@ -246,7 +244,7 @@ def match_detail(match_id):
     games = db.execute("SELECT * FROM game WHERE match_id = ?", (match_id,)).fetchall()
 
     if len(games) != 2:
-        return jsonify({"error": "Match not found"}), 404
+        return jsonify({"success": False, "message": "Match not found"}), 404
     
     game_1 = games[0]
     game_2 = games[1]
@@ -271,7 +269,7 @@ def versus():
 @app.route("/search")
 @login_required
 def search():
-    # Rendering a form for searching for other palyers
+    # Rendering a form for searching for other players
     username = request.args.get("user")
 
     if not username:
@@ -283,7 +281,7 @@ def search():
     if user:
        return redirect(url_for("view_profile", username=username))
     else:
-        flash("Palyer not found")
+        flash("Player not found")
         return render_template("search.html")
     
 
@@ -499,7 +497,6 @@ def join_game(data=None):
                     }, room=room_id)
 
                     socketio.start_background_task(game_timer, room_id)
-                    print(f"Invitation game started: {room_id}")
                 
                 # First player sent and invite
                 else:
@@ -514,7 +511,6 @@ def join_game(data=None):
                     }
 
                     emit("waiting", {"msg": "Waiting for invited player..."}, room=sid)
-                    print(f"Invitation room created: {room_id}")
 
                 return
 
@@ -554,7 +550,6 @@ def join_game(data=None):
 
                 # Uruchom timer i po 30 sekundach uruchom funkcje end_game
                 socketio.start_background_task(game_timer, room_id)
-                print(f"Game started: {room_id}")
 
 
 @socketio.on("submit_word")
@@ -573,6 +568,7 @@ def submit_word(data):
 
     if not player_data or not game["started"]:
         emit("error", {"msg": "Game hasn't started yet"})
+        return
 
     start, end = game["letters"]
     
@@ -600,7 +596,6 @@ def submit_word(data):
 
 
 def end_game(room):
-    print(f"===> ENding game for room {room}")
 
     # Sprawdź czy room istnieje
     if room not in games:
@@ -621,7 +616,7 @@ def end_game(room):
     with app.app_context():
         db = get_db()
 
-        match_id = db.execute("SELECT IFNULL(MAX(match_id_, 0) + 1 FROM game)").fetchone()[0]
+        match_id = db.execute("SELECT IFNULL(MAX(match_id), 0) + 1 FROM game").fetchone()[0]
 
         for player_sid in players:
             user_id = sid_user_map.get(player_sid)
@@ -654,13 +649,14 @@ def end_game(room):
         winner = loser = None
     with app.app_context():
         for p in results:
-            print(f"Emitting game_over to sid: {p['sid']}")
             socketio.emit("game_over", {
+                "start": start,
+                "end": end,
                 "your_score": p["score"],
                 "your_words": p["words"],
                 "opponent_score": results[1]["score"] if p == results[0] else results[0]["score"],
                 "opponent_words": results[1]["words"] if p == results[0] else results[0]["words"],
-                "result": "Win" if p == winner else ("Lose" if p == loser else "Draw")
+                "result": "Win" if p == winner else ("Loss" if p == loser else "Draw")
             }, to=p["sid"])
             db = get_db()
             if p == winner:
@@ -686,16 +682,11 @@ def handle_connect():
     user_id = session.get("user_id")
     if user_id:
         sid_user_map[request.sid] = user_id
-        print(f"User connected: SID={request.sid}, user_id={user_id}")
-    else:
-        print(f"Anonymous connection: SID={request.sid}")
 
 @socketio.on("disconnect")
 def handle_disconnect():
     global waiting_player
     sid = request.sid
-
-    print(f"User has disconnected: {sid}")
 
     if sid == waiting_player:
         waiting_player = None
@@ -714,7 +705,6 @@ def handle_disconnect_with_delay(sid, user_id, room):
     socketio.sleep(5)
 
     if user_id in sid_user_map.values():
-        print(f"User {user_id} reconnected - skipping invite cleanup")
         return
     
     cleanup_disconnected_players(sid, room, started=False)
@@ -728,7 +718,6 @@ def cleanup_disconnected_players(sid, room, started):
         db = get_db()
         db.execute("UPDATE game_invites SET status = 'canceled' WHERE room_id = ? AND status = 'pending'", (room,))
         db.commit()
-        print(f"Invite canceled due to disconnect: {room}")
 
     if sid in game["players"]:
         del game["players"][sid]

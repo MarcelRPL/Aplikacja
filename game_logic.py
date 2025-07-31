@@ -8,16 +8,14 @@ LETTER_POINTS = {
     "m": 3, "n": 1, "o": 1, "p": 3,
     "q": 10, "r": 1, "s": 1, "t": 1,
     "u": 1, "v": 4, "w": 4, "x": 8,
-    "y": 4, "z": 10, "ą": 5, "ć": 6,
-    "ę": 5, "ł": 3, "ń": 7, "ó": 7,
-    "ś": 5, "ź": 9, "ż": 5
+    "y": 4, "z": 10
 }
 
 VALID_WORD_RE = re.compile(r"^[a-ząćęłńóśźż]+$")
 
 
 def load_words(min_length=6):
-    with open("data/slowa.txt", encoding="utf-8") as f:
+    with open("data/words.txt", encoding="utf-8") as f:
         return set(
             word.strip().lower()
             for word in f 

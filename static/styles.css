@@ -6,7 +6,7 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 999;
+    z-index: 9999;
 }
 
 .modal h4#result {
@@ -260,6 +260,10 @@ h1, h2, h3, h4 {
     font-family: 'Special Elite', monospace;
     font-size: 1.1rem;
     text-align: center;
+}
+
+.uppercase {
+    text-transform: uppercase;
 }
 
 .word-display {

@@ -32,7 +32,7 @@
                             {% for solo in solos %}
                             <tr class="game-row" data-id="{{solo.id}}">
                                 <td>{{ solo.date }}</td>
-                                <td>{{ solo.start }}___{{ solo.end }}</td>
+                                <td class="uppercase">{{ solo.start }}___{{ solo.end }}</td>
                                 <td>{{ solo.score }}</td>
                             </tr>
                             {% endfor %}
@@ -64,7 +64,7 @@
                             {% for game in versus %}
                             <tr class="game-row2" data-match_id="{{game.match_id}}" data-user_id="{{game.user_id}}">
                                 <td>{{ game.date }}</td>
-                                <td>{{ game.start }}___{{ game.end }}</td>
+                                <td class="uppercase">{{ game.start }}___{{ game.end }}</td>
                                 <td>{{ game.opponent_username }}</td>
                                 <td>{{ game.score }}</td>
                                 <td>{{ game.opponent_score }}</td>
@@ -96,10 +96,10 @@
     <div id="summary" class="modal hidden">
         <div class="modal-content chalk-card text-light p-4">
             <h2>Summary</h2>
-            <p class="fs-5"><span id="summary-start"></span>____<span id="summary-end"></span></p>
+            <p class="fs-5"><span id="summary-start" class="uppercase"></span>____<span id="summary-end" class="uppercase"></span></p>
             <p><strong>Final score:</strong><span id="summary-score"></span></p>
             <p><strong>Guessed words:</strong></p>
-            <ul id="summary-words"></ul>
+            <ul id="summary-words" class="uppercase"></ul>
             <button id="close" class="button-chalk mt-3">Close</button>
         </div>
     </div>
@@ -108,15 +108,15 @@
         <div class="modal-content chalk-card text-light p-4">
             <h2 class="mb-3 text-center">Match Summary</h2>
             <h4 class="text-center mb-4" id="result"></h4>
-            <p style="font-weight: bold"><span id="summary-start-1v1"></span>____<span id="summary-end-1v1"></span></p>
+            <p style="font-weight: bold"><span id="summary-start-1v1" class="uppercase"></span>____<span id="summary-end-1v1" class="uppercase"></span></p>
             <div class="row">
                 <div class="col-md-6">
                     <h5>Your score: <span id="player-score"></span></h5>
-                    <ul id="player-words"></ul>
+                    <ul id="player-words" class="uppercase"></ul>
                 </div>
                 <div class="col-md-6">
                     <h5>Opponent's score: <span id="opponent-score"></span></h5>
-                    <ul id="opponent-words"></ul>
+                    <ul id="opponent-words" class="uppercase"></ul>
                 </div>
             </div>
             <div class="text-center">       
