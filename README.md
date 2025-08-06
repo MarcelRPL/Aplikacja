@@ -1,5 +1,5 @@
 # Filler Words
-### Video demo:
+### Video demo: https://youtu.be/0Wx3ykURSOA
 ### Description:
 
 My project is a word game that can be played on a browser. The general idea is that 2 random letters are generated and player has to find words that fit into those generated letters, are 6 characters long, and can be found in a game dictionary. This game has two game modes - one that is playable solo and the other that pits two players against each other through online matchmaking.
