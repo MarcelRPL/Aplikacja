@@ -1,5 +1,5 @@
 from datetime import datetime
-from flask import Flask, abort, render_template, request, flash, redirect, session, url_for, jsonify
+from flask import Flask, render_template, request, flash, redirect, session, url_for, jsonify
 from flask_session import  Session
 from flask_socketio import SocketIO, emit, join_room
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -8,6 +8,9 @@ import sqlite3, re, threading
 
 from helpers import login_required, get_db, close_db
 from game_logic import load_words, valid_word, calculate_score, random_letter
+
+#Some debugging and final touches were assisted by Chat GPT
+#Socket.io portion of the code was assisted by ChatGPT
 
 app = Flask(__name__)
 
@@ -24,30 +27,15 @@ pass_re = re.compile(r"^(?=.*\d)[A-Za-z\d]{6,}$")
 
 VALID_WORDS = load_words(min_length=6)
 
-lock = threading.Lock() # Przeciwdziałanie racing condition
+lock = threading.Lock() # Race condition countermeasure
 waiting_player = None
-games = {}  # Struktura danych do gier online
+games = {}  # Game data structure for online games
 sid_user_map = {}
 
 @app.route("/")
 @login_required
 def index():
-    #main game menu / looking for matches
-   
     db = get_db()
-    solos = db.execute("SELECT * FROM game WHERE user_id = ? AND mode = ? ORDER BY date DESC", (session["user_id"], "solo")).fetchall()
-    
-    versus_games = db.execute("SELECT * FROM game WHERE user_id = ? AND mode = ? ORDER BY date DESC", (session["user_id"], "1v1")).fetchall()
-
-    versus = []
-    for game in versus_games:
-        opponent_id = game["opponent_id"]
-        opponent_row = db.execute("SELECT username FROM users WHERE id = ?", (opponent_id,)).fetchone()
-        opponent_username = opponent_row["username"] if opponent_row else "Unknown"
-
-        game_dict = dict(game)
-        game_dict["opponent_username"] = opponent_username
-        versus.append(game_dict)
    
     all_friends= db.execute("SELECT * FROM friends WHERE user_id = ?", (session["user_id"],))
 
@@ -71,12 +59,10 @@ def index():
         friends.append(friend_dict)
 
     
-    return render_template("index.html", solos=solos, versus=versus, friends=friends)
+    return render_template("index.html", friends=friends)
 
 @app.route("/login", methods=["GET", "POST"])
-def login():
-    # User logging in
-    
+def login():   
     # Forget any user_id
     session.clear()
 
@@ -98,9 +84,9 @@ def login():
         cur = db.execute("SELECT * FROM users WHERE username = ?", (username,))
         rows = cur.fetchall()
 
-        #Check if there is only 1 row of data and hash is matching
+        # Check if there is only 1 row of data and hash is matching
         if len(rows) != 1 or not check_password_hash(rows[0]["hash"], password):
-            errors["both"] = "Invalid username or password"
+            errors["password"] = "Invalid username or password"
         else:
             # Remember which user has logged in
             session["user_id"] = rows[0]["id"]
@@ -115,8 +101,6 @@ def login():
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    # User registering
-
     # Check for all the possible wrong inputs
     errors = {}
     if request.method == "POST":
@@ -165,7 +149,6 @@ def register():
 @app.route("/logout")
 @login_required
 def logout():
-    #user logging out
     session.clear()
 
     return redirect("/")
@@ -210,16 +193,13 @@ def check_word():
 @login_required
 def save_game():
 
-    # pobierz dane z gry
     data = request.get_json()
 
-    if not all (k in data for k in ("start", "end", "score", "words")):
+    if not all (i in data for i in ("start", "end", "score", "words")):
         return jsonify({"success": False, "message": "Incomplete data"}), 400
-    # Wstaw pobrane dane w tabele "game" oraz ustal jaki to game_id
     db = get_db()
     game_id = db.execute("INSERT INTO game (user_id, start, end, score, mode, date) VALUES (?, ?, ?, ?, ?, ?)", (session["user_id"], data["start"], data["end"], data["score"], "solo", datetime.now().strftime("%Y-%m-%d"))).lastrowid
 
-    # Wstaw użyte słowa w table "words"
     for word in data["words"]:
         db.execute("INSERT INTO words (game_id, user_id, word) VALUES (?, ?, ?)", (game_id, session["user_id"], word))
         
@@ -523,16 +503,16 @@ def join_game(data=None):
                 player2 = sid
                 waiting_player = None
 
-                # Tworzymy pokój
+                # Creating a room
                 room_id = f"game_{player1}_{player2}"
                 join_room(room_id, sid=player1)
                 join_room(room_id, sid=player2)
                 
-                # Ustalamy litery
+                # Setting letters
                 start = random_letter()
                 end = random_letter()
 
-                # Tworzymy strukture danych dla danego pokoju
+                # Creating a game data structure for current room
                 games[room_id] = {
                     "players": {player1: {"words": [], "score": 0},
                                 player2: {"words": [], "score": 0}},
@@ -540,7 +520,7 @@ def join_game(data=None):
                     "started": True,
                 }
 
-                # Wysyłami wiadomość do serwera, aby rozpocząć grę i z jakimi danymi
+                # Send a message to the server to start the game and with what data
                 emit("start_game", {
                     "room": room_id,
                     "start_letter": start,
@@ -548,7 +528,7 @@ def join_game(data=None):
                     "time": 30
                 }, room=room_id)
 
-                # Uruchom timer i po 30 sekundach uruchom funkcje end_game
+                # Set the timer and after 30sec end the game
                 socketio.start_background_task(game_timer, room_id)
 
 
@@ -597,11 +577,11 @@ def submit_word(data):
 
 def end_game(room):
 
-    # Sprawdź czy room istnieje
+    # Check if room exists
     if room not in games:
         return
         
-    # Pobierz dane gry (dane graczy, ich punkty i słowa)
+    # Download game data
     game = games[room]
     players = list(game["players"].keys())
     if len(players) < 2:
@@ -627,7 +607,7 @@ def end_game(room):
             op_score = game["players"][opponent_sid]["score"]
             words = game["players"][player_sid]["words"]
         
-            # Zapisz dane z gry w bazie danych
+            # Save game data into a database
             game_id = db.execute("INSERT INTO game (user_id, opponent_id, start, end, score, opponent_score, mode, date, match_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (user_id, opponent_id, start, end, score, op_score, "1v1", datetime.now().date(), match_id)).lastrowid
         
             for word in words:
@@ -637,7 +617,7 @@ def end_game(room):
 
         db.commit()
 
-    # Porównaj wyniki
+    # Compare results
 
     p1, p2 = results
 
@@ -668,7 +648,7 @@ def end_game(room):
         
         db.commit()
 
-    # Usuwamy dane o zamkniętej grze
+    # Delete data of the finished game
     global waiting_player
     if waiting_player in room:
         waiting_player = None
